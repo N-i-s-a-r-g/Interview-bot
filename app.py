@@ -9,12 +9,6 @@ st.set_page_config(page_title="AI Interview Bot", layout="centered")
 
 st.title("🎤 AI Interview Bot")
 category = st.selectbox("Select Interview Type", ["HR", "Technical"])
-if "prev_category" not in st.session_state:
-    st.session_state.prev_category = category
-
-if st.session_state.prev_category != category:
-    st.session_state.question = random.choice(questions)
-    st.session_state.prev_category = category
 # Question bank
 if category == "HR":
     questions = [
@@ -30,6 +24,13 @@ else:
         "What is SQL?",
         "Explain OOP concepts"
     ]
+if "prev_category" not in st.session_state:
+    st.session_state.prev_category = category
+
+if st.session_state.prev_category != category:
+    st.session_state.question = random.choice(questions)
+    st.session_state.prev_category = category
+
 
 # Session state
 if "question" not in st.session_state:
@@ -86,8 +87,14 @@ if st.session_state.question_count == 5:
     elif st.session_state.total_score > 20:
         st.info("👍 Good, but can improve")
     else:
+        st.warning("⚠️ Needs improvement")    
+    elif st.session_state.total_score > 20:
+        
+        st.info("👍 Good, but can improve")
+    else:
         st.warning("⚠️ Needs improvement")
 
     if st.button("Restart Interview"):
         st.session_state.question_count = 0
         st.session_state.total_score = 0
+        st.session_state.question = random.choice(questions)

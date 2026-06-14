@@ -87,12 +87,12 @@ if st.session_state.question_count == 5:
     elif st.session_state.total_score > 20:
         st.info("👍 Good, but can improve")
     else:
-        st.warning("⚠️ Needs improvement")    
-    elif st.session_state.total_score > 20:
-        
-        st.info("👍 Good, but can improve")
-    else:
         st.warning("⚠️ Needs improvement")
+
+    if st.button("Restart Interview"):
+        st.session_state.question_count = 0
+        st.session_state.total_score = 0
+        st.session_state.question = random.choice(questions)
 
     if st.button("Restart Interview"):
         st.session_state.question_count = 0

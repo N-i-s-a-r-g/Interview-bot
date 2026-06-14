@@ -1,5 +1,6 @@
 import streamlit as st
 import random
+import speech_recognition as sr
 if "question_count" not in st.session_state:
     st.session_state.question_count = 0
 
@@ -43,6 +44,20 @@ st.write(st.session_state.question)
 
 # User answer
 answer = st.text_area("✍️ Your Answer:")
+if st.button("🎤 Use Voice Input"):
+
+    r = sr.Recognizer()
+
+    with sr.Microphone() as source:
+        st.info("Speak now...")
+        audio = r.listen(source)
+
+        try:
+            text = r.recognize_google(audio)
+            st.success("You said: " + text)
+            answer = text
+        except:
+            st.error("Could not understand audio")
 
 # Submit
 if st.button("Submit Answer"):

@@ -88,13 +88,10 @@ if st.session_state.question_count == 5:
         st.info("👍 Good, but can improve")
     else:
         st.warning("⚠️ Needs improvement")
+if st.button("Restart Interview", key="restart_btn"):
+    st.session_state.question_count = 0
+    st.session_state.total_score = 0
+    st.session_state.question = random.choice(questions)
+    st.rerun()
 
-    if st.button("Restart Interview"):
-        st.session_state.question_count = 0
-        st.session_state.total_score = 0
-        st.session_state.question = random.choice(questions)
-
-    if st.button("Restart Interview"):
-        st.session_state.question_count = 0
-        st.session_state.total_score = 0
-        st.session_state.question = random.choice(questions)
+    

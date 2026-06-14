@@ -37,6 +37,7 @@ if "question" not in st.session_state:
     st.session_state.question = random.choice(questions)
 
 # Show question
+st.write(f"Question {st.session_state.question_count + 1} of 5")
 st.subheader("❓ Interview Question")
 st.write(st.session_state.question)
 
@@ -73,7 +74,24 @@ if st.button("Submit Answer"):
         # 👉 NEW
         st.session_state.total_score += score
         st.session_state.question_count += 1
+# AI-like feedback
+st.subheader("🤖 AI Feedback")
 
+if len(answer.split()) > 30:
+    st.success("Strong answer with good explanation")
+elif len(answer.split()) > 15:
+    st.info("Decent answer, try adding more details")
+else:
+    st.warning("Answer is too short, elaborate more")
+
+if "project" not in answer.lower():
+    st.write("👉 Try mentioning a project")
+
+if "because" not in answer.lower():
+    st.write("👉 Add reasoning using 'because'")
+
+if "example" not in answer.lower():
+    st.write("👉 Add an example for clarity")
 # Next question
 if st.button("Next Question") and st.session_state.question_count < 5:
     st.session_state.question = random.choice(questions)
@@ -88,10 +106,25 @@ if st.session_state.question_count == 5:
         st.info("👍 Good, but can improve")
     else:
         st.warning("⚠️ Needs improvement")
+  st.download_button("📥 Download Report", report, file_name="interview_report.txt")      
 if st.button("Restart Interview", key="restart_btn"):
     st.session_state.question_count = 0
     st.session_state.total_score = 0
     st.session_state.question = random.choice(questions)
     st.rerun()
+report = f"""
+Interview Report
 
+Total Score: {st.session_state.total_score}/50
+Questions Answered: {st.session_state.question_count}
+
+Performance:
+"""
+
+if st.session_state.total_score > 35:
+    report += "Excellent"
+elif st.session_state.total_score > 20:
+    report += "Good"
+else:
+    report += "Needs Improvement"
     

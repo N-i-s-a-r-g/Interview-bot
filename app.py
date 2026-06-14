@@ -121,12 +121,35 @@ if st.session_state.question_count == 5:
         st.info("👍 Good, but can improve")
     else:
         st.warning("⚠️ Needs improvement")
-  st.download_button("📥 Download Report", report, file_name="interview_report.txt")      
-if st.button("Restart Interview", key="restart_btn"):
-    st.session_state.question_count = 0
-    st.session_state.total_score = 0
-    st.session_state.question = random.choice(questions)
-    st.rerun()
+
+    # 👉 REPORT
+    report = f"""
+Interview Report
+
+Total Score: {st.session_state.total_score}/50
+Questions Answered: {st.session_state.question_count}
+"""
+
+    if st.session_state.total_score > 35:
+        report += "Performance: Excellent"
+    elif st.session_state.total_score > 20:
+        report += "Performance: Good"
+    else:
+        report += "Performance: Needs Improvement"
+
+    # 👉 DOWNLOAD (FIXED INDENT)
+    st.download_button(
+        "📥 Download Report",
+        report,
+        file_name="interview_report.txt"
+    )
+
+    # 👉 RESTART
+    if st.button("Restart Interview", key="restart_btn"):
+        st.session_state.question_count = 0
+        st.session_state.total_score = 0
+        st.session_state.question = random.choice(questions)
+        st.rerun()
 report = f"""
 Interview Report
 

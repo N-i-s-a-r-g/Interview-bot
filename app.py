@@ -1,6 +1,39 @@
 import streamlit as st
 import random
 import speech_recognition as sr
+# Dummy user database (for now)
+users = {
+    "nisarg": "1234",
+    "admin": "admin"
+}
+
+# Session state init
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+
+# LOGIN FUNCTION
+def login():
+    st.title("🔐 Login")
+
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
+
+    if st.button("Login"):
+        if username in users and users[username] == password:
+            st.session_state.logged_in = True
+            st.session_state.user = username
+            st.success("Login Successful ✅")
+            st.rerun()
+        else:
+            st.error("Invalid Credentials ❌")
+            if not st.session_state.logged_in:
+    login()
+else:
+    st.title("🎤 AI Interview Bot")
+    st.write(f"Welcome {st.session_state.user} 👋")
+    if st.button("Logout"):
+    st.session_state.logged_in = False
+    st.rerun()
 if "question_count" not in st.session_state:
     st.session_state.question_count = 0
 

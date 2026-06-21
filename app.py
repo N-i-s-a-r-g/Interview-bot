@@ -80,7 +80,7 @@ else:
     c.execute("SELECT username FROM users")
     users = c.fetchall()
 
-st.table(users)
+    st.table(users)
 
     # Logout
     if st.button("Logout"):

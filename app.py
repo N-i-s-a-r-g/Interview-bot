@@ -1,6 +1,18 @@
 import streamlit as st
 import random
 import speech_recognition as sr
+import sqlite3
+
+# DB connect
+conn = sqlite3.connect("users.db", check_same_thread=False)
+c = conn.cursor()
+c.execute("""
+CREATE TABLE IF NOT EXISTS users (
+    username TEXT,
+    password TEXT
+)
+""")
+conn.commit()
 
 # ⚠️ 1. Set page config MUST be the first Streamlit command!
 st.set_page_config(page_title="AI Interview Bot", layout="centered")
@@ -24,19 +36,35 @@ if "total_score" not in st.session_state:
 
 # LOGIN FUNCTION
 def login():
-    st.title("🔐 Login")
+    st.title("🔐 Authentication")
 
-    username = st.text_input("Username", key="login_user")
-    password = st.text_input("Password", type="password", key="login_pass")
+    mode = st.radio("Select", ["Login", "Signup"])
 
-    if st.button("Login"):
-        if username in users and users[username] == password:
-            st.session_state.logged_in = True
-            st.session_state.user = username
-            st.success("Login Successful ✅")
-            st.rerun()
-        else:
-            st.error("Invalid Credentials ❌")
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
+
+    # 🔥 SIGNUP
+    if mode == "Signup":
+        if st.button("Create Account"):
+            c.execute("SELECT * FROM users WHERE username=?", (username,))
+            if c.fetchone():
+                st.error("User already exists ❌")
+            else:
+                c.execute("INSERT INTO users VALUES (?, ?)", (username, password))
+                conn.commit()
+                st.success("Account created ✅")
+
+    # 🔥 LOGIN
+    else:
+        if st.button("Login"):
+            c.execute("SELECT * FROM users WHERE username=? AND password=?", (username, password))
+            if c.fetchone():
+                st.session_state.logged_in = True
+                st.session_state.user = username
+                st.success("Login Successful ✅")
+                st.rerun()
+            else:
+                st.error("Invalid Credentials ❌")
 
 
 # MAIN APP FLOW
@@ -44,11 +72,15 @@ if not st.session_state.logged_in:
     login()
 
 else:
-    # 🛑 EVERYTHING FROM HERE UNTIL THE END IS INDENTED INSIDE THE 'ELSE' BLOCK
     st.title("🎤 AI Interview Bot")
     st.write(f"Welcome {st.session_state.user} 👋")
 
-    # Logout button
+    # 🔴 BONUS (DB check)
+    st.subheader("👥 All Users (Debug)")
+    c.execute("SELECT * FROM users")
+    st.write(c.fetchall())
+
+    # Logout
     if st.button("Logout"):
         st.session_state.logged_in = False
         st.rerun()

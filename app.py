@@ -78,7 +78,9 @@ else:
     # 🔴 BONUS (DB check)
     st.subheader("👥 All Users (Debug)")
     c.execute("SELECT username FROM users")
-    st.write(c.fetchall())
+    users = c.fetchall()
+
+st.table(users)
 
     # Logout
     if st.button("Logout"):

@@ -204,32 +204,32 @@ else:
     # Final results
     if st.session_state.question_count >= 5:
 
-    # SAVE TO DATABASE
-    if not st.session_state.saved:
-        c.execute(
-            "INSERT INTO interview_history (username, score, category, date) VALUES (?, ?, ?, ?)",
-            (
-                st.session_state.user,
-                st.session_state.total_score,
-                category,
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        # SAVE TO DATABASE
+        if not st.session_state.saved:
+            c.execute(
+                "INSERT INTO interview_history (username, score, category, date) VALUES (?, ?, ?, ?)",
+                (
+                    st.session_state.user,
+                    st.session_state.total_score,
+                    category,
+                    datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                )
             )
-        )
-        conn.commit()
-        st.session_state.saved = True
+            conn.commit()
+            st.session_state.saved = True
 
-    # FINAL RESULT UI
-    st.subheader("🏁 Final Interview Result")
-    st.write(f"Total Score: {st.session_state.total_score} / 50")
+        # FINAL RESULT UI
+        st.subheader("🏁 Final Interview Result")
+        st.write(f"Total Score: {st.session_state.total_score} / 50")
 
-    if st.session_state.total_score > 35:
-        st.success("🔥 Excellent performance!")
-    elif st.session_state.total_score > 20:
-        st.info("👍 Good, but can improve")
-    else:
-        st.warning("⚠️ Needs improvement")
+        if st.session_state.total_score > 35:
+            st.success("🔥 Excellent performance!")
+        elif st.session_state.total_score > 20:
+            st.info("👍 Good, but can improve")
+        else:
+            st.warning("⚠️ Needs improvement")
 
-        # Create download report text
+        # REPORT
         report = f"Interview Report\n\nTotal Score: {st.session_state.total_score}/50\nQuestions Answered: {st.session_state.question_count}\nPerformance: "
         if st.session_state.total_score > 35:
             report += "Excellent"
@@ -244,6 +244,7 @@ else:
             file_name="interview_report.txt"
         )
 
+        # RESTART
         if st.button("Restart Interview", key="restart_btn"):
             st.session_state.saved = False
             st.session_state.question_count = 0

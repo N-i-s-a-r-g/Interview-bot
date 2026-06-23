@@ -181,6 +181,118 @@ if st.button("Logout"):
             feedback = ""
             score = 0
 
+# MAIN APP FLOW
+if not st.session_state.logged_in:
+    login()
+
+else:
+    # ===============================
+    # MAIN HEADER
+    # ===============================
+    st.title("🎤 AI Interview Bot")
+    st.write(f"Welcome {st.session_state.user} 👋")
+
+    # ===============================
+    # 📊 USER HISTORY
+    # ===============================
+    st.subheader("📊 My Interview History")
+
+    c.execute(
+        "SELECT score, category, date FROM interview_history WHERE username=? ORDER BY id DESC",
+        (st.session_state.user,)
+    )
+
+    history = c.fetchall()
+
+    if history:
+        st.table(history)
+        scores = [row[0] for row in history]
+        st.line_chart(scores)
+    else:
+        st.info("No history yet")
+
+    # ===============================
+    # 👥 ALL USERS (DEBUG)
+    # ===============================
+    st.subheader("👥 All Users (Debug)")
+    c.execute("SELECT username FROM users")
+    users = c.fetchall()
+    st.table(users)
+
+    # ===============================
+    # 🚪 LOGOUT
+    # ===============================
+    if st.button("Logout"):
+        st.session_state.logged_in = False
+        st.rerun()
+
+    st.markdown("---")
+
+    # ===============================
+    # 🎯 CATEGORY
+    # ===============================
+    category = st.selectbox("Select Interview Type", ["HR", "Technical"])
+
+    if category == "HR":
+        questions = [
+            "Tell me about yourself",
+            "Why should we hire you?",
+            "What are your strengths?",
+            "What are your weaknesses?"
+        ]
+    else:
+        questions = [
+            "What is Python?",
+            "Explain Machine Learning",
+            "What is SQL?",
+            "Explain OOP concepts"
+        ]
+
+    # ===============================
+    # SESSION STATE
+    # ===============================
+    if "prev_category" not in st.session_state:
+        st.session_state.prev_category = category
+
+    if st.session_state.prev_category != category:
+        st.session_state.question = random.choice(questions)
+        st.session_state.prev_category = category
+
+    if "question" not in st.session_state:
+        st.session_state.question = random.choice(questions)
+
+    # ===============================
+    # QUESTION DISPLAY
+    # ===============================
+    st.write(f"Question {st.session_state.question_count + 1} of 5")
+    st.subheader("❓ Interview Question")
+    st.write(st.session_state.question)
+
+    answer = st.text_area("✍️ Your Answer:")
+
+    # ===============================
+    # 🎤 VOICE INPUT
+    # ===============================
+    if st.button("🎤 Use Voice Input"):
+        r = sr.Recognizer()
+        with sr.Microphone() as source:
+            st.info("Speak now...")
+            audio = r.listen(source)
+            try:
+                text = r.recognize_google(audio)
+                st.success("You said: " + text)
+                answer = text
+            except:
+                st.error("Could not understand audio")
+
+    # ===============================
+    # SUBMIT ANSWER
+    # ===============================
+    if st.button("Submit Answer"):
+        if answer:
+            feedback = ""
+            score = 0
+
             if len(answer) > 50:
                 score += 5
                 feedback += "✅ Good detailed answer\n"
@@ -204,7 +316,9 @@ if st.button("Logout"):
             st.session_state.total_score += score
             st.session_state.question_count += 1
 
-    # AI-like feedback
+    # ===============================
+    # 🤖 AI FEEDBACK
+    # ===============================
     st.subheader("🤖 AI Feedback")
 
     if len(answer.split()) > 30:
@@ -222,16 +336,19 @@ if st.button("Logout"):
 
     if "example" not in answer.lower():
         st.write("👉 Add an example for clarity")
-        
-    # Next question logic
+
+    # ===============================
+    # NEXT QUESTION
+    # ===============================
     if st.button("Next Question") and st.session_state.question_count < 5:
         st.session_state.question = random.choice(questions)
         st.rerun()
-        
-    # Final results
+
+    # ===============================
+    # FINAL RESULT
+    # ===============================
     if st.session_state.question_count >= 5:
 
-        # SAVE TO DATABASE
         if not st.session_state.saved:
             c.execute(
                 "INSERT INTO interview_history (username, score, category, date) VALUES (?, ?, ?, ?)",
@@ -245,7 +362,6 @@ if st.button("Logout"):
             conn.commit()
             st.session_state.saved = True
 
-        # FINAL RESULT UI
         st.subheader("🏁 Final Interview Result")
         st.write(f"Total Score: {st.session_state.total_score} / 50")
 
@@ -256,23 +372,16 @@ if st.button("Logout"):
         else:
             st.warning("⚠️ Needs improvement")
 
-        # REPORT
-        report = f"Interview Report\n\nTotal Score: {st.session_state.total_score}/50\nQuestions Answered: {st.session_state.question_count}\nPerformance: "
-        if st.session_state.total_score > 35:
-            report += "Excellent"
-        elif st.session_state.total_score > 20:
-            report += "Good"
-        else:
-            report += "Needs Improvement"
+        report = f"""
+Interview Report
 
-        st.download_button(
-            "📥 Download Report",
-            report,
-            file_name="interview_report.txt"
-        )
+Score: {st.session_state.total_score}/50
+Questions: {st.session_state.question_count}
+"""
 
-        # RESTART
-        if st.button("Restart Interview", key="restart_btn"):
+        st.download_button("📥 Download Report", report)
+
+        if st.button("Restart Interview"):
             st.session_state.saved = False
             st.session_state.question_count = 0
             st.session_state.total_score = 0

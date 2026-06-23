@@ -2,16 +2,23 @@ import streamlit as st
 import random
 import speech_recognition as sr
 import sqlite3
+from datetime import datetime
 
 # DB connect
 conn = sqlite3.connect("users.db", check_same_thread=False)
 c = conn.cursor()
+
+# Create table
 c.execute("""
-CREATE TABLE IF NOT EXISTS users (
+CREATE TABLE IF NOT EXISTS interview_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT,
-    password TEXT
+    score INTEGER,
+    category TEXT,
+    date TEXT
 )
 """)
+
 conn.commit()
 
 # ⚠️ 1. Set page config MUST be the first Streamlit command!
@@ -26,7 +33,10 @@ users = {
 # Session init
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
-
+    
+if "saved" not in st.session_state:
+    st.session_state.saved = False
+    
 if "question_count" not in st.session_state:
     st.session_state.question_count = 0
 
@@ -193,6 +203,19 @@ else:
         
     # Final results
     if st.session_state.question_count >= 5:
+        # SAVE TO DATABASE
+        if not st.session_state.saved:
+    c.execute(
+        "INSERT INTO interview_history (username, score, category, date) VALUES (?, ?, ?, ?)",
+        (
+            st.session_state.user,
+            st.session_state.total_score,
+            category,
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        )
+    )
+    conn.commit()
+    st.session_state.saved = True
         st.subheader("🏁 Final Interview Result")
         st.write(f"Total Score: {st.session_state.total_score} / 50")
 
@@ -219,6 +242,7 @@ else:
         )
 
         if st.button("Restart Interview", key="restart_btn"):
+            st.session_state.saved = False
             st.session_state.question_count = 0
             st.session_state.total_score = 0
             st.session_state.question = random.choice(questions)

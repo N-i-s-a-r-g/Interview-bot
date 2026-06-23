@@ -111,16 +111,21 @@ if history:
     scores = [row[0] for row in history]
     st.line_chart(scores)
 
+if history:
+    st.table(history)
+
+    scores = [row[0] for row in history]
+    st.line_chart(scores)
+
 else:
     st.info("No history yet")
 
-    # 🔴 BONUS (DB check)
-    st.subheader("👥 All Users (Debug)")
-    c.execute("SELECT username FROM users")
-    users = c.fetchall()
 
-    st.table(users)
-
+# 🔥 OUTSIDE if-else
+st.subheader("👥 All Users (Debug)")
+c.execute("SELECT username FROM users")
+users = c.fetchall()
+st.table(users)
     # Logout
     if st.button("Logout"):
         st.session_state.logged_in = False

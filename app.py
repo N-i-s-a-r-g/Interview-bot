@@ -4,7 +4,12 @@ import speech_recognition as sr
 import sqlite3
 from datetime import datetime
 
-# DB connect
+# ⚠️ 1. Set page config MUST be the first Streamlit command!
+st.set_page_config(page_title="AI Interview Bot", layout="centered")
+
+# ==========================================
+# 🗄️ DATABASE CONNECTION & CREATION
+# ==========================================
 conn = sqlite3.connect("users.db", check_same_thread=False)
 c = conn.cursor()
 
@@ -26,56 +31,51 @@ CREATE TABLE IF NOT EXISTS interview_history (
     date TEXT
 )
 """)
-
 conn.commit()
 
-# ⚠️ 1. Set page config MUST be the first Streamlit command!
-st.set_page_config(page_title="AI Interview Bot", layout="centered")
-
-# Dummy user database
-users = {
-    "nisarg": "1234",
-    "admin": "admin"
-}
-
-# Session init
+# ==========================================
+# 🧠 MEMORY MANAGEMENT (Session State)
+# ==========================================
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
-    
+
 if "user" not in st.session_state:
     st.session_state.user = None
-    
+
 if "saved" not in st.session_state:
     st.session_state.saved = False
-    
+
 if "question_count" not in st.session_state:
     st.session_state.question_count = 0
 
 if "total_score" not in st.session_state:
     st.session_state.total_score = 0
 
-
-# LOGIN FUNCTION
+# ==========================================
+# 🔐 AUTHENTICATION FUNCTION
+# ==========================================
 def login():
     st.title("🔐 Authentication")
 
-    mode = st.radio("Select", ["Login", "Signup"])
+    mode = st.radio("Select Action", ["Login", "Signup"], horizontal=True)
+    username = st.text_input("Username", key="auth_user")
+    password = st.text_input("Password", type="password", key="auth_pass")
 
-    username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
-
-    # 🔥 SIGNUP
+    # 🔥 SIGNUP LOGIC
     if mode == "Signup":
         if st.button("Create Account"):
-            c.execute("SELECT * FROM users WHERE username=?", (username,))
-            if c.fetchone():
-                st.error("User already exists ❌")
+            if username and password:
+                c.execute("SELECT * FROM users WHERE username=?", (username,))
+                if c.fetchone():
+                    st.error("User already exists ❌")
+                else:
+                    c.execute("INSERT INTO users VALUES (?, ?)", (username, password))
+                    conn.commit()
+                    st.success("Account created successfully ✅ Go to Login!")
             else:
-                c.execute("INSERT INTO users VALUES (?, ?)", (username, password))
-                conn.commit()
-                st.success("Account created ✅")
+                st.warning("Please enter username and password! ⚠️")
 
-    # 🔥 LOGIN
+    # 🔥 LOGIN LOGIC
     else:
         if st.button("Login"):
             c.execute("SELECT * FROM users WHERE username=? AND password=?", (username, password))
@@ -87,48 +87,46 @@ def login():
             else:
                 st.error("Invalid Credentials ❌")
 
-
-# MAIN APP FLOW
+# ==========================================
+# 🚀 MAIN APP FLOW CONTROL
+# ==========================================
 if not st.session_state.logged_in:
     login()
 
 else:
+    # 🛑 EVERYTHING FROM HERE TILL THE END IS INDENTED INSIDE 'ELSE' BLOCK
     st.title("🎤 AI Interview Bot")
-    st.write(f"Welcome {st.session_state.user} 👋")
+    st.write(f"Welcome **{st.session_state.user}** 👋")
+    
+    # Logout Button inside the block
+    if st.button("Logout 🚪"):
+        st.session_state.logged_in = False
+        st.session_state.user = None
+        st.rerun()
+
+    st.markdown("---")
+
+    # --- HISTORY TAB ---
     st.subheader("📊 My Interview History")
+    c.execute(
+        "SELECT score, category, date FROM interview_history WHERE username=? ORDER BY id DESC",
+        (st.session_state.user,)
+    )
+    history = c.fetchall()
 
-c.execute(
-    "SELECT score, category, date FROM interview_history WHERE username=? ORDER BY id DESC",
-    (st.session_state.user,)
-)
+    if history:
+        st.table(history)
+        scores = [row[0] for row in history]
+        st.line_chart(scores) 
+    else:
+        st.info("No history yet 📋 Start your first interview below!")
 
-history = c.fetchall()
+    st.markdown("---")
 
-if history:
-    st.table(history)
-
-    scores = [row[0] for row in history]
-    st.line_chart(scores)
-
-else:
-    st.info("No history yet")
-
-
-# 🔥 OUTSIDE if-else
-st.subheader("👥 All Users (Debug)")
-c.execute("SELECT username FROM users")
-users = c.fetchall()
-st.table(users)
-    # Logout
-if st.button("Logout"):
-   st.session_state.logged_in = False
-   st.rerun()
-
-   st.markdown("---")
-
+    # --- INTERVIEW FLOW ---
     category = st.selectbox("Select Interview Type", ["HR", "Technical"])
     
-    # Question bank
+    # Question bank setup
     if category == "HR":
         questions = [
             "Tell me about yourself",
@@ -151,16 +149,15 @@ if st.button("Logout"):
         st.session_state.question = random.choice(questions)
         st.session_state.prev_category = category
 
-    # Session state for question tracking
     if "question" not in st.session_state:
         st.session_state.question = random.choice(questions)
 
-    # Show question
+    # Question UI
     st.write(f"Question {st.session_state.question_count + 1} of 5")
     st.subheader("❓ Interview Question")
     st.write(st.session_state.question)
 
-    # User answer
+    # Answer input
     answer = st.text_area("✍️ Your Answer:")
     
     if st.button("🎤 Use Voice Input"):
@@ -175,124 +172,11 @@ if st.button("Logout"):
             except:
                 st.error("Could not understand audio")
 
-    # Submit
+    # Submit Analysis
     if st.button("Submit Answer"):
         if answer:
             feedback = ""
             score = 0
-
-# MAIN APP FLOW
-if not st.session_state.logged_in:
-    login()
-
-else:
-    # ===============================
-    # MAIN HEADER
-    # ===============================
-    st.title("🎤 AI Interview Bot")
-    st.write(f"Welcome {st.session_state.user} 👋")
-
-    # ===============================
-    # 📊 USER HISTORY
-    # ===============================
-    st.subheader("📊 My Interview History")
-
-    c.execute(
-        "SELECT score, category, date FROM interview_history WHERE username=? ORDER BY id DESC",
-        (st.session_state.user,)
-    )
-
-    history = c.fetchall()
-
-    if history:
-        st.table(history)
-        scores = [row[0] for row in history]
-        st.line_chart(scores)
-    else:
-        st.info("No history yet")
-
-    # ===============================
-    # 👥 ALL USERS (DEBUG)
-    # ===============================
-    st.subheader("👥 All Users (Debug)")
-    c.execute("SELECT username FROM users")
-    users = c.fetchall()
-    st.table(users)
-
-    # ===============================
-    # 🚪 LOGOUT
-    # ===============================
-    if st.button("Logout"):
-        st.session_state.logged_in = False
-        st.rerun()
-
-    st.markdown("---")
-
-    # ===============================
-    # 🎯 CATEGORY
-    # ===============================
-    category = st.selectbox("Select Interview Type", ["HR", "Technical"])
-
-    if category == "HR":
-        questions = [
-            "Tell me about yourself",
-            "Why should we hire you?",
-            "What are your strengths?",
-            "What are your weaknesses?"
-        ]
-    else:
-        questions = [
-            "What is Python?",
-            "Explain Machine Learning",
-            "What is SQL?",
-            "Explain OOP concepts"
-        ]
-
-    # ===============================
-    # SESSION STATE
-    # ===============================
-    if "prev_category" not in st.session_state:
-        st.session_state.prev_category = category
-
-    if st.session_state.prev_category != category:
-        st.session_state.question = random.choice(questions)
-        st.session_state.prev_category = category
-
-    if "question" not in st.session_state:
-        st.session_state.question = random.choice(questions)
-
-    # ===============================
-    # QUESTION DISPLAY
-    # ===============================
-    st.write(f"Question {st.session_state.question_count + 1} of 5")
-    st.subheader("❓ Interview Question")
-    st.write(st.session_state.question)
-
-    answer = st.text_area("✍️ Your Answer:")
-
-    # ===============================
-    # 🎤 VOICE INPUT
-    # ===============================
-    if st.button("🎤 Use Voice Input"):
-        r = sr.Recognizer()
-        with sr.Microphone() as source:
-            st.info("Speak now...")
-            audio = r.listen(source)
-            try:
-                text = r.recognize_google(audio)
-                st.success("You said: " + text)
-                answer = text
-            except:
-                st.error("Could not understand audio")
-
-    # ===============================
-    # SUBMIT ANSWER
-    # ===============================
-    if st.button("Submit Answer"):
-        if answer:
-            feedback = ""
-            score = 0
-
             if len(answer) > 50:
                 score += 5
                 feedback += "✅ Good detailed answer\n"
@@ -312,15 +196,11 @@ else:
 
             st.subheader("⭐ Score")
             st.write(f"{score} / 10")
-
             st.session_state.total_score += score
             st.session_state.question_count += 1
 
-    # ===============================
-    # 🤖 AI FEEDBACK
-    # ===============================
+    # AI feedback analysis
     st.subheader("🤖 AI Feedback")
-
     if len(answer.split()) > 30:
         st.success("Strong answer with good explanation")
     elif len(answer.split()) > 15:
@@ -330,25 +210,19 @@ else:
 
     if "project" not in answer.lower():
         st.write("👉 Try mentioning a project")
-
     if "because" not in answer.lower():
         st.write("👉 Add reasoning using 'because'")
-
     if "example" not in answer.lower():
         st.write("👉 Add an example for clarity")
-
-    # ===============================
-    # NEXT QUESTION
-    # ===============================
+        
+    # Navigation
     if st.button("Next Question") and st.session_state.question_count < 5:
         st.session_state.question = random.choice(questions)
         st.rerun()
-
-    # ===============================
-    # FINAL RESULT
-    # ===============================
+        
+    # --- END SCREEN GENERATOR ---
     if st.session_state.question_count >= 5:
-
+        # SAVE PERFORMANCE INTO SQLITE DB PERMANENTLY
         if not st.session_state.saved:
             c.execute(
                 "INSERT INTO interview_history (username, score, category, date) VALUES (?, ?, ?, ?)",
@@ -361,6 +235,7 @@ else:
             )
             conn.commit()
             st.session_state.saved = True
+            st.success("Results saved to history! 💾")
 
         st.subheader("🏁 Final Interview Result")
         st.write(f"Total Score: {st.session_state.total_score} / 50")
@@ -372,18 +247,31 @@ else:
         else:
             st.warning("⚠️ Needs improvement")
 
-        report = f"""
-Interview Report
+        # Report logic
+        report = f"Interview Report\n\nTotal Score: {st.session_state.total_score}/50\nQuestions Answered: {st.session_state.question_count}\nPerformance: "
+        if st.session_state.total_score > 35:
+            report += "Excellent"
+        elif st.session_state.total_score > 20:
+            report += "Good"
+        else:
+            report += "Needs Improvement"
 
-Score: {st.session_state.total_score}/50
-Questions: {st.session_state.question_count}
-"""
+        st.download_button(
+            "📥 Download Report",
+            report,
+            file_name="interview_report.txt"
+        )
 
-        st.download_button("📥 Download Report", report)
-
-        if st.button("Restart Interview"):
+        if st.button("Restart Interview", key="restart_btn"):
             st.session_state.saved = False
             st.session_state.question_count = 0
             st.session_state.total_score = 0
             st.session_state.question = random.choice(questions)
             st.rerun()
+
+    # --- DEBUG SECTION (INSIDE LOGGED_IN APP SYSTEM) ---
+    st.markdown("---")
+    st.subheader("👥 System Active Users (Debug Mode)")
+    c.execute("SELECT username FROM users")
+    all_users = c.fetchall()
+    st.table(all_users)

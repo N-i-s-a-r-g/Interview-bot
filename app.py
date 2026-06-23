@@ -107,13 +107,6 @@ history = c.fetchall()
 if history:
     st.table(history)
 
-    # 🔥 GRAPH
-    scores = [row[0] for row in history]
-    st.line_chart(scores)
-
-if history:
-    st.table(history)
-
     scores = [row[0] for row in history]
     st.line_chart(scores)
 
@@ -127,11 +120,11 @@ c.execute("SELECT username FROM users")
 users = c.fetchall()
 st.table(users)
     # Logout
-    if st.button("Logout"):
-        st.session_state.logged_in = False
-        st.rerun()
+if st.button("Logout"):
+   st.session_state.logged_in = False
+   st.rerun()
 
-    st.markdown("---")
+   st.markdown("---")
 
     category = st.selectbox("Select Interview Type", ["HR", "Technical"])
     

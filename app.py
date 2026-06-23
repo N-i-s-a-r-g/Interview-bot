@@ -92,6 +92,24 @@ if not st.session_state.logged_in:
 else:
     st.title("🎤 AI Interview Bot")
     st.write(f"Welcome {st.session_state.user} 👋")
+    st.subheader("📊 My Interview History")
+
+c.execute(
+    "SELECT score, category, date FROM interview_history WHERE username=? ORDER BY id DESC",
+    (st.session_state.user,)
+)
+
+history = c.fetchall()
+
+if history:
+    st.table(history)
+
+    # 🔥 GRAPH
+    scores = [row[0] for row in history]
+    st.line_chart(scores)
+
+else:
+    st.info("No history yet")
 
     # 🔴 BONUS (DB check)
     st.subheader("👥 All Users (Debug)")

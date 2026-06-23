@@ -3,6 +3,7 @@ import random
 import speech_recognition as sr
 import sqlite3
 from datetime import datetime
+from google import genai  # 👈 New Free SDK
 
 # ⚠️ 1. Set page config MUST be the first Streamlit command!
 st.set_page_config(page_title="AI Interview Bot", layout="centered")
@@ -13,7 +14,6 @@ st.set_page_config(page_title="AI Interview Bot", layout="centered")
 conn = sqlite3.connect("users.db", check_same_thread=False)
 c = conn.cursor()
 
-# Create users table
 c.execute("""
 CREATE TABLE IF NOT EXISTS users (
     username TEXT PRIMARY KEY,
@@ -21,7 +21,6 @@ CREATE TABLE IF NOT EXISTS users (
 )
 """)
 
-# Create interview history table
 c.execute("""
 CREATE TABLE IF NOT EXISTS interview_history (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -51,17 +50,21 @@ if "question_count" not in st.session_state:
 if "total_score" not in st.session_state:
     st.session_state.total_score = 0
 
+# 🔥 Store feedback & dynamic score dynamically so rerun doesn't wipe them
+if "ai_feedback" not in st.session_state:
+    st.session_state.ai_feedback = "Submit an answer to see AI insights."
+if "current_score" not in st.session_state:
+    st.session_state.current_score = 0
+
 # ==========================================
 # 🔐 AUTHENTICATION FUNCTION
 # ==========================================
 def login():
     st.title("🔐 Authentication")
-
     mode = st.radio("Select Action", ["Login", "Signup"], horizontal=True)
     username = st.text_input("Username", key="auth_user")
     password = st.text_input("Password", type="password", key="auth_pass")
 
-    # 🔥 SIGNUP LOGIC
     if mode == "Signup":
         if st.button("Create Account"):
             if username and password:
@@ -74,8 +77,6 @@ def login():
                     st.success("Account created successfully ✅ Go to Login!")
             else:
                 st.warning("Please enter username and password! ⚠️")
-
-    # 🔥 LOGIN LOGIC
     else:
         if st.button("Login"):
             c.execute("SELECT * FROM users WHERE username=? AND password=?", (username, password))
@@ -92,13 +93,10 @@ def login():
 # ==========================================
 if not st.session_state.logged_in:
     login()
-
 else:
-    # 🛑 EVERYTHING FROM HERE TILL THE END IS INDENTED INSIDE 'ELSE' BLOCK
     st.title("🎤 AI Interview Bot")
     st.write(f"Welcome **{st.session_state.user}** 👋")
     
-    # Logout Button inside the block
     if st.button("Logout 🚪"):
         st.session_state.logged_in = False
         st.session_state.user = None
@@ -126,7 +124,6 @@ else:
     # --- INTERVIEW FLOW ---
     category = st.selectbox("Select Interview Type", ["HR", "Technical"])
     
-    # Question bank setup
     if category == "HR":
         questions = [
             "Tell me about yourself",
@@ -152,12 +149,10 @@ else:
     if "question" not in st.session_state:
         st.session_state.question = random.choice(questions)
 
-    # Question UI
     st.write(f"Question {st.session_state.question_count + 1} of 5")
     st.subheader("❓ Interview Question")
     st.write(st.session_state.question)
 
-    # Answer input
     answer = st.text_area("✍️ Your Answer:")
     
     if st.button("🎤 Use Voice Input"):
@@ -172,57 +167,73 @@ else:
             except:
                 st.error("Could not understand audio")
 
-    # Submit Analysis
+    # ==========================================
+    # 🤖 NEW: REAL AI EVALUATION WITH GEMINI
+    # ==========================================
     if st.button("Submit Answer"):
         if answer:
-            feedback = ""
-            score = 0
-            if len(answer) > 50:
-                score += 5
-                feedback += "✅ Good detailed answer\n"
-            else:
-                feedback += "⚠️ Answer too short\n"
+            with st.spinner("🤖 AI is analyzing your answer... Please wait..."):
+                try:
+                    # ⚠️ Paste your actual API key below inside quotes
+                    client = genai.Client(api_key="YOUR_GEMINI_API_KEY_HERE")
+                    
+                    prompt = f"""
+                    You are an expert tech and HR interviewer. Evaluate the candidate's answer for the given question.
+                    
+                    Question: "{st.session_state.question}"
+                    Candidate Answer: "{answer}"
+                    Interview Type: "{category}"
+                    
+                    Provide the response in the exact following format:
+                    SCORE: [Give an integer score out of 10 based on accuracy, e.g., 7]
+                    FEEDBACK: [Provide a constructive 2-3 line feedback with strengths and improvement points]
+                    """
+                    
+                    response = client.models.generate_content(
+                        model='gemini-1.5-flash',
+                        contents=prompt,
+                    )
+                    
+                    response_text = response.text
+                    
+                    # Simple parsing to separate Score and Feedback
+                    if "SCORE:" in response_text and "FEEDBACK:" in response_text:
+                        parts = response_text.split("FEEDBACK:")
+                        score_part = parts[0].replace("SCORE:", "").strip()
+                        feedback_part = parts[1].strip()
+                        
+                        # Extract integer out of score_part securely
+                        extracted_score = int(''.join(filter(str.isdigit, score_part)))
+                    else:
+                        extracted_score = 5
+                        feedback_part = response_text
+                        
+                    st.session_state.current_score = extracted_score
+                    st.session_state.ai_feedback = feedback_part
+                    
+                    # Update global scores
+                    st.session_state.total_score += extracted_score
+                    st.session_state.question_count += 1
+                    st.success("Answer Evaluated by Real AI! ✅ Click 'Next Question'")
+                    
+                except Exception as e:
+                    st.error(f"Gemini API Error: {e}")
 
-            if "project" in answer.lower():
-                score += 3
-                feedback += "✅ Mentioned project\n"
-
-            if "experience" in answer.lower():
-                score += 2
-                feedback += "✅ Mentioned experience\n"
-
-            st.subheader("📊 Feedback")
-            st.write(feedback)
-
-            st.subheader("⭐ Score")
-            st.write(f"{score} / 10")
-            st.session_state.total_score += score
-            st.session_state.question_count += 1
-
-    # AI feedback analysis
-    st.subheader("🤖 AI Feedback")
-    if len(answer.split()) > 30:
-        st.success("Strong answer with good explanation")
-    elif len(answer.split()) > 15:
-        st.info("Decent answer, try adding more details")
-    else:
-        st.warning("Answer is too short, elaborate more")
-
-    if "project" not in answer.lower():
-        st.write("👉 Try mentioning a project")
-    if "because" not in answer.lower():
-        st.write("👉 Add reasoning using 'because'")
-    if "example" not in answer.lower():
-        st.write("👉 Add an example for clarity")
+    # Display Dynamic AI evaluation updates on UI
+    st.markdown("---")
+    st.subheader("📊 Real-Time AI Review")
+    st.metric(label="Last Answer Score", value=f"{st.session_state.current_score} / 10")
+    st.info(st.session_state.ai_feedback)
         
     # Navigation
     if st.button("Next Question") and st.session_state.question_count < 5:
         st.session_state.question = random.choice(questions)
+        st.session_state.ai_feedback = "Submit an answer to see AI insights."
+        st.session_state.current_score = 0
         st.rerun()
         
     # --- END SCREEN GENERATOR ---
     if st.session_state.question_count >= 5:
-        # SAVE PERFORMANCE INTO SQLITE DB PERMANENTLY
         if not st.session_state.saved:
             c.execute(
                 "INSERT INTO interview_history (username, score, category, date) VALUES (?, ?, ?, ?)",
@@ -235,10 +246,10 @@ else:
             )
             conn.commit()
             st.session_state.saved = True
-            st.success("Results saved to history! 💾")
+            st.success("Results saved to history permanently! 💾")
 
         st.subheader("🏁 Final Interview Result")
-        st.write(f"Total Score: {st.session_state.total_score} / 50")
+        st.write(f"Total Cumulative Score: {st.session_state.total_score} / 50")
 
         if st.session_state.total_score > 35:
             st.success("🔥 Excellent performance!")
@@ -247,7 +258,6 @@ else:
         else:
             st.warning("⚠️ Needs improvement")
 
-        # Report logic
         report = f"Interview Report\n\nTotal Score: {st.session_state.total_score}/50\nQuestions Answered: {st.session_state.question_count}\nPerformance: "
         if st.session_state.total_score > 35:
             report += "Excellent"
@@ -266,10 +276,12 @@ else:
             st.session_state.saved = False
             st.session_state.question_count = 0
             st.session_state.total_score = 0
+            st.session_state.current_score = 0
+            st.session_state.ai_feedback = "Submit an answer to see AI insights."
             st.session_state.question = random.choice(questions)
             st.rerun()
 
-    # --- DEBUG SECTION (INSIDE LOGGED_IN APP SYSTEM) ---
+    # Debug block helper
     st.markdown("---")
     st.subheader("👥 System Active Users (Debug Mode)")
     c.execute("SELECT username FROM users")

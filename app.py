@@ -8,7 +8,15 @@ from datetime import datetime
 conn = sqlite3.connect("users.db", check_same_thread=False)
 c = conn.cursor()
 
-# Create table
+# Create users table
+c.execute("""
+CREATE TABLE IF NOT EXISTS users (
+    username TEXT PRIMARY KEY,
+    password TEXT
+)
+""")
+
+# Create interview history table
 c.execute("""
 CREATE TABLE IF NOT EXISTS interview_history (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

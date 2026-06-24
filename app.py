@@ -175,7 +175,7 @@ else:
             with st.spinner("🤖 AI is analyzing your answer... Please wait..."):
                 try:
                     # ⚠️ Paste your actual API key below inside quotes
-                    client = genai.Client(api_key="YOUR_GEMINI_API_KEY_HERE")
+                    client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
                     
                     prompt = f"""
                     You are an expert tech and HR interviewer. Evaluate the candidate's answer for the given question.

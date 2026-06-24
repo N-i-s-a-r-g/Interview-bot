@@ -284,7 +284,7 @@ else:
     # Debug block helper
     st.markdown("---")
     if st.session_state.user == "admin":
-    st.subheader("👥 All Users")
+       st.subheader("👥 All Users")
     c.execute("SELECT username FROM users")
     users = c.fetchall()
-    st.table(users)
+       st.table(users)

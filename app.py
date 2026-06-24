@@ -155,8 +155,9 @@ else:
 
     answer = st.text_area("✍️ Your Answer:")
     
-    if st.button("🎤 Use Voice Input"):
-       st.warning("⚠️ Voice input not supported in deployed version")
+        if st.button("🎤 Use Voice Input"):
+        st.warning("⚠️ Voice input not supported in deployed version")
+        r = sr.Recognizer()  # Make sure 'r' is initialized inside the button click
         with sr.Microphone() as source:
             st.info("Speak now...")
             audio = r.listen(source)
@@ -164,8 +165,9 @@ else:
                 text = r.recognize_google(audio)
                 st.success("You said: " + text)
                 answer = text
-            except:
+            except Exception as e:
                 st.error("Could not understand audio")
+
 
     # ==========================================
     # 🤖 NEW: REAL AI EVALUATION WITH GEMINI

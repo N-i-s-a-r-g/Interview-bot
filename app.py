@@ -155,7 +155,7 @@ else:
 
     answer = st.text_area("✍️ Your Answer:")
     
-        if st.button("🎤 Use Voice Input"):
+    if st.button("🎤 Use Voice Input"):
         st.warning("⚠️ Voice input not supported in deployed version")
         r = sr.Recognizer()  # Make sure 'r' is initialized inside the button click
         with sr.Microphone() as source:
@@ -167,8 +167,6 @@ else:
                 answer = text
             except Exception as e:
                 st.error("Could not understand audio")
-
-
     # ==========================================
     # 🤖 NEW: REAL AI EVALUATION WITH GEMINI
     # ==========================================

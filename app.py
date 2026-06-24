@@ -156,7 +156,7 @@ else:
     answer = st.text_area("✍️ Your Answer:")
     
     if st.button("🎤 Use Voice Input"):
-        r = sr.Recognizer()
+    st.warning("⚠️ Voice input not supported in deployed version")
         with sr.Microphone() as source:
             st.info("Speak now...")
             audio = r.listen(source)

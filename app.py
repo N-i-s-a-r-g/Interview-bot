@@ -9,21 +9,34 @@ import hashlib
 # ⚠️ 1. Set page config MUST be the first Streamlit command!
 st.set_page_config(page_title="AI Interview Bot", layout="centered")
 st.markdown("""
+st.markdown("""
 <style>
 
-/* 🔥 Background */
+/* 🌈 Animated Gradient Background */
 body {
-    background: linear-gradient(135deg, #0f172a, #1e293b);
+    background: linear-gradient(-45deg, #020617, #0f172a, #0ea5e9, #1d4ed8);
+    background-size: 400% 400%;
+    animation: gradientBG 10s ease infinite;
 }
 
-/* 🔐 Title Styling */
-h1 {
-    color: #f1f5f9;
-    text-align: center;
+/* Animation */
+@keyframes gradientBG {
+    0% {background-position: 0% 50%;}
+    50% {background-position: 100% 50%;}
+    100% {background-position: 0% 50%;}
 }
 
-/* 🧊 Input Fields */
-.stTextInput input {
+/* 🧊 Glass Effect Main Container */
+.block-container {
+    background: rgba(15, 23, 42, 0.65);
+    backdrop-filter: blur(15px);
+    border-radius: 20px;
+    padding: 2rem;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+/* 🔐 Input Fields */
+.stTextInput input, .stTextArea textarea {
     background-color: #1e293b;
     color: white;
     border-radius: 10px;
@@ -31,9 +44,15 @@ h1 {
     padding: 10px;
 }
 
+/* Focus glow */
+.stTextInput input:focus, .stTextArea textarea:focus {
+    border: 1px solid #3b82f6;
+    box-shadow: 0 0 10px #3b82f6;
+}
+
 /* 🎯 Buttons */
 .stButton>button {
-    background: linear-gradient(135deg, #2563eb, #3b82f6);
+    background: linear-gradient(135deg, #3b82f6, #6366f1);
     color: white;
     border-radius: 12px;
     padding: 10px 20px;
@@ -44,17 +63,11 @@ h1 {
 /* ✨ Hover Animation */
 .stButton>button:hover {
     transform: translateY(-3px) scale(1.05);
-    background: linear-gradient(135deg, #1d4ed8, #2563eb);
-    box-shadow: 0 8px 20px rgba(37, 99, 235, 0.5);
+    background: linear-gradient(135deg, #2563eb, #4f46e5);
+    box-shadow: 0 8px 25px rgba(99,102,241,0.7);
 }
 
-/* 📦 Cards / Sections */
-.block-container {
-    padding: 2rem;
-    border-radius: 15px;
-}
-
-/* 📊 Table Styling */
+/* 📊 Tables */
 .stTable {
     background-color: #1e293b;
     border-radius: 10px;
@@ -62,7 +75,18 @@ h1 {
 
 /* 📢 Info Box */
 .stAlert {
-    border-radius: 10px;
+    border-radius: 12px;
+}
+
+/* 📝 Headings */
+h1, h2, h3 {
+    color: #f8fafc;
+    text-align: center;
+}
+
+/* Divider */
+hr {
+    border: 1px solid #334155;
 }
 
 </style>

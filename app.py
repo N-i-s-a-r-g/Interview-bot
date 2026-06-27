@@ -3,14 +3,15 @@ import random
 import speech_recognition as sr
 import sqlite3
 from datetime import datetime
-from google import genai  # 👈 New Free SDK
+from google import genai 
 import hashlib
+
 # ⚠️ 1. Set page config MUST be the first Streamlit command!
 st.set_page_config(page_title="AI Interview Bot", layout="centered")
 
-# ==========================================
-# 🗄️ DATABASE CONNECTION & CREATION
-# ==========================================
+# ==============================================================================
+# 🗄️ SECTION 1: DATABASE CONNECTION & SCHEMA SETUP
+# ==============================================================================
 conn = sqlite3.connect("users.db", check_same_thread=False)
 c = conn.cursor()
 
@@ -31,12 +32,14 @@ CREATE TABLE IF NOT EXISTS interview_history (
 )
 """)
 conn.commit()
+
+# Password Security Hashing
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
-# ==========================================
-# 🧠 MEMORY MANAGEMENT (Session State)
-# ==========================================
+# ==============================================================================
+# 🧠 SECTION 2: MEMORY MANAGEMENT (Session State Initialization)
+# ==============================================================================
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 
@@ -52,25 +55,29 @@ if "question_count" not in st.session_state:
 if "total_score" not in st.session_state:
     st.session_state.total_score = 0
 
-# 🔥 Store feedback & dynamic score dynamically so rerun doesn't wipe them
 if "ai_feedback" not in st.session_state:
     st.session_state.ai_feedback = "Submit an answer to see AI insights."
+
 if "current_score" not in st.session_state:
     st.session_state.current_score = 0
+
 if "otp" not in st.session_state:
     st.session_state.otp = None
 
 if "otp_user" not in st.session_state:
     st.session_state.otp_user = None
-# ==========================================
-# 🔐 AUTHENTICATION FUNCTION
-# ==========================================
+
+# ==============================================================================
+# 🔐 SECTION 3: AUTHENTICATION FLOW (Login, Signup & Forgot Password)
+# ==============================================================================
 def login():
     st.title("🔐 Authentication")
     mode = st.radio("Select Action", ["Login", "Signup", "Forgot Password"], horizontal=True)
+    
     username = st.text_input("Username", key="auth_user")
     password = st.text_input("Password", type="password", key="auth_pass")
 
+    # 📁 SUB-SECTION: SIGNUP MODE
     if mode == "Signup":
         if st.button("Create Account"):
             if username and password:
@@ -84,42 +91,42 @@ def login():
                     st.success("Account created successfully ✅ Go to Login!")
             else:
                 st.warning("Please enter username and password! ⚠️")
-                elif mode == "Forgot Password":
-                    st.subheader("🔑 Reset Password with OTP")
+                
+    # 📁 SUB-SECTION: FORGOT PASSWORD MODE 
+    elif mode == "Forgot Password":
+        st.subheader("🔑 Reset Password with OTP")
 
-                    if st.button("Send OTP"):
-                    if username:
-                    c.execute("SELECT * FROM users WHERE username=?", (username,))
-            
-                    if c.fetchone():
-                       otp = random.randint(1000, 9999)   # 👈 OTP generate
-                       st.session_state.otp = str(otp)    # 👈 store in session
-                       st.session_state.otp_user = username
+        if st.button("Send OTP"):
+            if username:
+                c.execute("SELECT * FROM users WHERE username=?", (username,))
+                if c.fetchone():
+                    otp = random.randint(1000, 9999)   
+                    st.session_state.otp = str(otp)    
+                    st.session_state.otp_user = username
+                    st.success(f"OTP: {otp} (demo only)")  
+                else:
+                    st.error("User not found ❌")
+            else:
+                st.warning("Enter your username above first! ⚠️")
+                
+        entered_otp = st.text_input("Enter OTP")
+        new_password = st.text_input("New Password", type="password")
 
-                       st.success(f"OTP: {otp} (demo only)")  # 👈 show OTP
-                   else:
-                       st.error("User not found ❌")
-                   else:
-                       st.warning("Enter username and new password ⚠️")
-                       entered_otp = st.text_input("Enter OTP")
-                       new_password = st.text_input("New Password", type="password")
-
-                    if st.button("Verify & Reset"):
-                    if entered_otp == st.session_state.otp:
-                       hashed = hash_password(new_password)
-
-                       c.execute(
-                        "UPDATE users SET password=? WHERE username=?",
-                       (hashed, st.session_state.otp_user)
-                       )
-                       conn.commit()
-
-                       st.success("Password reset successful ✅")
-
-                       st.session_state.otp = None
-                       st.session_state.otp_user = None
-                   else:
-                       st.error("Invalid OTP ❌")
+        if st.button("Verify & Reset"):
+            if st.session_state.otp and entered_otp == st.session_state.otp:
+                hashed = hash_password(new_password)
+                c.execute(
+                    "UPDATE users SET password=? WHERE username=?",
+                    (hashed, st.session_state.otp_user)
+                )
+                conn.commit()
+                st.success("Password reset successful ✅ You can log in now!")
+                st.session_state.otp = None
+                st.session_state.otp_user = None
+            else:
+                st.error("Invalid OTP or session expired ❌")
+                
+    # 📁 SUB-SECTION: LOGIN MODE
     else:
         if st.button("Login"):
             hashed = hash_password(password)
@@ -132,9 +139,9 @@ def login():
             else:
                 st.error("Invalid Credentials ❌")
 
-# ==========================================
-# 🚀 MAIN APP FLOW CONTROL
-# ==========================================
+# ==============================================================================
+# 🚀 SECTION 4: CORE APPLICATION FLOW (Runs only after validation)
+# ==============================================================================
 if not st.session_state.logged_in:
     login()
 else:
@@ -148,7 +155,7 @@ else:
 
     st.markdown("---")
 
-    # --- HISTORY TAB ---
+    # 📊 SUB-SECTION: USER HISTORY DASHBOARD
     st.subheader("📊 My Interview History")
     c.execute(
         "SELECT score, category, date FROM interview_history WHERE username=? ORDER BY id DESC",
@@ -165,7 +172,7 @@ else:
 
     st.markdown("---")
 
-    # --- INTERVIEW FLOW ---
+    # 🎤 SUB-SECTION: LIVE INTERVIEW FLOW RUNNER
     category = st.selectbox("Select Interview Type", ["HR", "Technical"])
     
     if category == "HR":
@@ -199,9 +206,10 @@ else:
 
     answer = st.text_area("✍️ Your Answer:")
     
+    # 🎙️ AUDIO CAPTURE SYSTEM
     if st.button("🎤 Use Voice Input"):
         st.warning("⚠️ Voice input not supported in deployed version")
-        r = sr.Recognizer()  # Make sure 'r' is initialized inside the button click
+        r = sr.Recognizer()  
         with sr.Microphone() as source:
             st.info("Speak now...")
             audio = r.listen(source)
@@ -211,14 +219,12 @@ else:
                 answer = text
             except Exception as e:
                 st.error("Could not understand audio")
-    # ==========================================
-    # 🤖 NEW: REAL AI EVALUATION WITH GEMINI
-    # ==========================================
+
+    # 🤖 AI PROCESSING LAYER (GEMINI CALL)
     if st.button("Submit Answer"):
         if answer:
             with st.spinner("🤖 AI is analyzing your answer... Please wait..."):
                 try:
-                    # ⚠️ Paste your actual API key below inside quotes
                     client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
                     
                     prompt = f"""
@@ -240,13 +246,10 @@ else:
                     
                     response_text = response.text
                     
-                    # Simple parsing to separate Score and Feedback
                     if "SCORE:" in response_text and "FEEDBACK:" in response_text:
                         parts = response_text.split("FEEDBACK:")
                         score_part = parts[0].replace("SCORE:", "").strip()
                         feedback_part = parts[1].strip()
-                        
-                        # Extract integer out of score_part securely
                         extracted_score = int(''.join(filter(str.isdigit, score_part)))
                     else:
                         extracted_score = 5
@@ -255,7 +258,6 @@ else:
                     st.session_state.current_score = extracted_score
                     st.session_state.ai_feedback = feedback_part
                     
-                    # Update global scores
                     st.session_state.total_score += extracted_score
                     st.session_state.question_count += 1
                     st.success("Answer Evaluated by Real AI! ✅ Click 'Next Question'")
@@ -263,20 +265,20 @@ else:
                 except Exception as e:
                     st.error(f"Gemini API Error: {e}")
 
-    # Display Dynamic AI evaluation updates on UI
+    # UI Feedback Presentation Rendering
     st.markdown("---")
     st.subheader("📊 Real-Time AI Review")
     st.metric(label="Last Answer Score", value=f"{st.session_state.current_score} / 10")
     st.info(st.session_state.ai_feedback)
         
-    # Navigation
+    # Navigation Matrix Control
     if st.button("Next Question") and st.session_state.question_count < 5:
         st.session_state.question = random.choice(questions)
         st.session_state.ai_feedback = "Submit an answer to see AI insights."
         st.session_state.current_score = 0
         st.rerun()
         
-    # --- END SCREEN GENERATOR ---
+    # 🏁 SUB-SECTION: RESULTS & METRIC DOWNLOAD GENERATOR
     if st.session_state.question_count >= 5:
         if not st.session_state.saved:
             c.execute(
@@ -325,10 +327,10 @@ else:
             st.session_state.question = random.choice(questions)
             st.rerun()
 
-    # Debug block helper
-    st.markdown("---")
+    # 🛠️ SUB-SECTION: ADMIN PANEL LOG PANEL CONTROLS
     if st.session_state.user == "admin":
-       st.subheader("👥 All Users")
-    c.execute("SELECT username FROM users")
-    users = c.fetchall()
-    st.table(users)
+        st.markdown("---")
+        st.subheader("👥 All Users (Admin Control Panel)")
+        c.execute("SELECT username FROM users")
+        all_registered_users = c.fetchall()
+        st.table(all_registered_users)

@@ -296,21 +296,23 @@ else:
     if "question" not in st.session_state:
         st.session_state.question = random.choice(questions)
 
+        # ==============================================================================
+    # ❓ SECTION: QUESTION DISPLAY & BACKGROUND TIMER TRACKING
+    # ==============================================================================
     st.write(f"Question {st.session_state.question_count + 1} of 5")
     st.subheader("❓ Interview Question")
     st.write(st.session_state.question)
 
-    # ==============================================================================
-    # ==============================================================================
-    # ⏱️ UPGRADE 2: INTERVIEW QUESTION TIMER (TIMESTAMP VALIDATION ENGINE)
-    # ==============================================================================
-    # Record the timestamp when the question was first shown
+    # Background Timestamp Validation Engine (No UI Loops!)
     if "q_start_time" not in st.session_state or st.session_state.get("last_q_tracked") != st.session_state.question:
         st.session_state.q_start_time = time.time()
         st.session_state.last_q_tracked = st.session_state.question
 
-    st.info("⏱️ **Time Limit:** 60 Seconds allowed per question. Your typing speed is monitored!")
+    st.info("⏱️ **Time Limit:** 60 Seconds recommended per question. Your pacing is evaluated at submission!")
 
+    # ✍️ FIXED INPUT BOX (Static key keeps it persistent and visible)
+    answer = st.text_area("✍️ Your Answer:", key="user_interview_answer_box")
+    
     # 🎙️ AUDIO CAPTURE SYSTEM
     if st.button("🎤 Use Voice Input"):
         st.warning("⚠️ Voice input not supported in deployed version")
@@ -325,19 +327,18 @@ else:
             except Exception as e:
                 st.error("Could not understand audio")
 
-        # ==============================================================================
-    # 🤖 UPGRADE 4: AI PROCESSING LAYER (WITH TIME PENALTY LOGIC)
+    # ==============================================================================
+    # 🤖 AI PROCESSING LAYER (WITH TIME PENALTY LOGIC)
     # ==============================================================================
     if st.button("Submit Answer"):
         if answer:
-            # Calculate exactly how long the user took
+            # Calculate total seconds taken in background
             time_taken = int(time.time() - st.session_state.q_start_time)
             
             with st.spinner("🤖 AI is analyzing your answer... Please wait..."):
                 try:
                     client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
                     
-                    # We pass the time taken into the prompt so Gemini knows if they were fast or slow!
                     prompt = f"""
                     You are an expert tech and HR interviewer. Evaluate the candidate's answer for the given question.
                     
@@ -360,7 +361,7 @@ else:
                     
                     response_text = response.text
                     
-                    # Secure integer extractor out of raw text response
+                    # Extract score safely
                     extracted_score = 5
                     if "SCORE:" in response_text:
                         try:
@@ -372,7 +373,7 @@ else:
                     st.session_state.current_score = extracted_score
                     st.session_state.ai_feedback = f"⏱️ **Time Taken:** {time_taken} seconds\n\n{response_text}"
                     
-                    # Cache current item details to session stack memory
+                    # Store to session history arrays
                     st.session_state.session_answers.append(f"Q: {st.session_state.question} | A: {answer} | Time: {time_taken}s")
                     st.session_state.session_reviews.append(f"Q: {st.session_state.question} (Took {time_taken}s) | Review:\n{response_text}")
                     
@@ -382,6 +383,9 @@ else:
                     
                 except Exception as e:
                     st.error(f"Gemini API Error: {e}")
+        else:
+            st.warning("Please type your answer before submitting! ⚠️")
+
 
                     
                     # UPGRADE 3: Cache current item details to session stack memory

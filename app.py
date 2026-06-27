@@ -305,6 +305,30 @@ else:
     st.write(f"Question {st.session_state.question_count + 1} of 5")
     st.subheader("❓ Interview Question")
     st.write(st.session_state.question)
+        # ==============================================================================
+    # ⏱️ SUB-SECTION: INTERVIEW QUESTION TIMER (UPGRADE 2)
+    # ==============================================================================
+    import time
+    
+    # Initialize timestamp memory elements
+    if "start_time" not in st.session_state or st.session_state.get("last_q") != st.session_state.question:
+        st.session_state.start_time = time.time()
+        st.session_state.last_q = st.session_state.question
+
+    elapsed_time = int(time.time() - st.session_state.start_time)
+    remaining_time = max(0, 60 - elapsed_time)
+
+    # UI Visual elements tracker rendering grid
+    if remaining_time > 0:
+        st.progress(remaining_time / 60)
+        st.write(f"⏳ **Time Remaining:** {remaining_time} seconds")
+        # Automatically trigger lightweight rerun to refresh clock ticks down
+        if remaining_time > 1:
+            time.sleep(1)
+            st.rerun()
+    else:
+        st.error("⏰ **Time's Up!** Please type your final summary and click 'Submit Answer' immediately!")
+
 
     answer = st.text_area("✍️ Your Answer:")
     

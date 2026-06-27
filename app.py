@@ -8,6 +8,65 @@ import hashlib
 
 # ⚠️ 1. Set page config MUST be the first Streamlit command!
 st.set_page_config(page_title="AI Interview Bot", layout="centered")
+st.markdown("""
+<style>
+
+/* 🔥 Background */
+body {
+    background: linear-gradient(135deg, #0f172a, #1e293b);
+}
+
+/* 🔐 Title Styling */
+h1 {
+    color: #f1f5f9;
+    text-align: center;
+}
+
+/* 🧊 Input Fields */
+.stTextInput input {
+    background-color: #1e293b;
+    color: white;
+    border-radius: 10px;
+    border: 1px solid #334155;
+    padding: 10px;
+}
+
+/* 🎯 Buttons */
+.stButton>button {
+    background: linear-gradient(135deg, #2563eb, #3b82f6);
+    color: white;
+    border-radius: 12px;
+    padding: 10px 20px;
+    border: none;
+    transition: all 0.3s ease;
+}
+
+/* ✨ Hover Animation */
+.stButton>button:hover {
+    transform: translateY(-3px) scale(1.05);
+    background: linear-gradient(135deg, #1d4ed8, #2563eb);
+    box-shadow: 0 8px 20px rgba(37, 99, 235, 0.5);
+}
+
+/* 📦 Cards / Sections */
+.block-container {
+    padding: 2rem;
+    border-radius: 15px;
+}
+
+/* 📊 Table Styling */
+.stTable {
+    background-color: #1e293b;
+    border-radius: 10px;
+}
+
+/* 📢 Info Box */
+.stAlert {
+    border-radius: 10px;
+}
+
+</style>
+""", unsafe_allow_html=True)
 
 # ==============================================================================
 # 🗄️ SECTION 1: DATABASE CONNECTION & SCHEMA SETUP

@@ -9,7 +9,6 @@ import hashlib
 # ⚠️ 1. Set page config MUST be the first Streamlit command!
 st.set_page_config(page_title="AI Interview Bot", layout="centered")
 st.markdown("""
-st.markdown("""
 <style>
 
 /* 🌈 Animated Gradient Background */

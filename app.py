@@ -305,12 +305,13 @@ else:
     st.write(f"Question {st.session_state.question_count + 1} of 5")
     st.subheader("❓ Interview Question")
     st.write(st.session_state.question)
+    # ==============================================================================
         # ==============================================================================
-    # ⏱️ SUB-SECTION: INTERVIEW QUESTION TIMER (UPGRADE 2)
+    # ⏱️ SUB-SECTION: INTERVIEW QUESTION TIMER (UPGRADE 2 - FIXED STABLE VERSION)
     # ==============================================================================
     import time
     
-    # Initialize timestamp memory elements
+    # Track the start of the current question
     if "start_time" not in st.session_state or st.session_state.get("last_q") != st.session_state.question:
         st.session_state.start_time = time.time()
         st.session_state.last_q = st.session_state.question
@@ -318,16 +319,13 @@ else:
     elapsed_time = int(time.time() - st.session_state.start_time)
     remaining_time = max(0, 60 - elapsed_time)
 
-    # UI Visual elements tracker rendering grid
+    # Clean non-blocking UI alert status maps
     if remaining_time > 0:
+        # Simple progress tracking indicator
         st.progress(remaining_time / 60)
-        st.write(f"⏳ **Time Remaining:** {remaining_time} seconds")
-        # Automatically trigger lightweight rerun to refresh clock ticks down
-        if remaining_time > 1:
-            time.sleep(1)
-            st.rerun()
+        st.write(f"⏳ **Time Remaining:** `{remaining_time}` seconds (Refresh page to tick down manually or write answer before it hits 0)")
     else:
-        st.error("⏰ **Time's Up!** Please type your final summary and click 'Submit Answer' immediately!")
+        st.error("⏰ **Time's Up!** Please summarize your thoughts and click 'Submit Answer' right away!")
 
 
     answer = st.text_area("✍️ Your Answer:")

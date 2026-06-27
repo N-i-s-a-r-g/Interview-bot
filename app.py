@@ -306,7 +306,8 @@ else:
     st.subheader("❓ Interview Question")
     st.write(st.session_state.question)
     # ==============================================================================
-    # ⏱️ SUB-SECTION: INTERVIEW QUESTION TIMER (UPGRADE 2 - LIVE RUNNING VERSION)
+    # ==============================================================================
+    # ⏱️ SUB-SECTION: INTERVIEW QUESTION TIMER (UPGRADE 2 - STABLE RUNNING VERSION)
     # ==============================================================================
     import time
 
@@ -318,28 +319,18 @@ else:
     elapsed_time = int(time.time() - st.session_state.start_time)
     remaining_time = max(0, 60 - elapsed_time)
 
-    # JavaScript logic inject करायची जी ब्राउझरवरच रिअल-टाइम काउंटडाऊन दाखवेल
+    # Static component allocation map object container
+    timer_placeholder = st.empty()
+
     if remaining_time > 0:
-        st.markdown(f"""
-        <div style="padding:10px; border-radius:10px; background-color:#1e293b; border:1px solid #334155; margin-bottom:15px; text-align:center;">
-            <span style="color:#0ea5e9; font-weight:bold; font-size:1.1rem;">⏳ Live Time Remaining: </span>
-            <span id="live-countdown" style="color:#ef4444; font-weight:bold; font-size:1.3rem;">{remaining_time}</span> seconds
-        </div>
-        
-        <script>
-            var seconds = {remaining_time};
-            var timer = setInterval(function() {{
-                seconds--;
-                document.getElementById('live-countdown').innerText = seconds;
-                if (seconds <= 0) {{
-                    clearInterval(timer);
-                    window.location.reload(); // Time संपल्यावर ऑटोमॅटिकली पेज रिफ्रेश करून अलर्ट दाखवणार
-                }}
-            }}, 1000);
-        </script>
-        """, unsafe_allow_html=True)
+        # Render tracking format container blocks elements grid alignment setup properties
+        timer_placeholder.metric(label="⏳ Live Time Remaining", value=f"{remaining_time} seconds")
+        # Check active state and sleep runtime loop ticker cleanly
+        if remaining_time > 1:
+            time.sleep(1)
+            st.rerun()
     else:
-        st.error("⏰ **Time's Up!** Please type your answer and click 'Submit Answer' immediately!")
+        timer_placeholder.error("⏰ **Time's Up!** Please type your summary and click 'Submit Answer' immediately!")
 
 
     answer = st.text_area("✍️ Your Answer:")

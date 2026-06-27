@@ -301,24 +301,16 @@ else:
     st.write(st.session_state.question)
 
     # ==============================================================================
-    # ⏱️ UPGRADE 2: INTERVIEW QUESTION TIMER (SAFE NON-BLOCKING FIXED VERSION)
     # ==============================================================================
-    if "start_time" not in st.session_state or st.session_state.get("last_q") != st.session_state.question:
-        st.session_state.start_time = time.time()
-        st.session_state.last_q = st.session_state.question
+    # ⏱️ UPGRADE 2: INTERVIEW QUESTION TIMER (TIMESTAMP VALIDATION ENGINE)
+    # ==============================================================================
+    # Record the timestamp when the question was first shown
+    if "q_start_time" not in st.session_state or st.session_state.get("last_q_tracked") != st.session_state.question:
+        st.session_state.q_start_time = time.time()
+        st.session_state.last_q_tracked = st.session_state.question
 
-    elapsed_time = int(time.time() - st.session_state.start_time)
-    remaining_time = max(0, 60 - elapsed_time)
+    st.info("⏱️ **Time Limit:** 60 Seconds allowed per question. Your typing speed is monitored!")
 
-    if remaining_time > 0:
-        st.metric(label="⏳ Time Remaining for this question", value=f"{remaining_time} Seconds")
-        if remaining_time < 15:
-            st.warning("⚠️ Action window closing! Please finalize your thoughts and submit.")
-    else:
-        st.error("⏰ **Time's Up!** Please summarize your thoughts and click 'Submit Answer' immediately!")
-
-    answer = st.text_area("✍️ Your Answer:", key=f"ans_{st.session_state.question_count}")
-    
     # 🎙️ AUDIO CAPTURE SYSTEM
     if st.button("🎤 Use Voice Input"):
         st.warning("⚠️ Voice input not supported in deployed version")
@@ -333,27 +325,32 @@ else:
             except Exception as e:
                 st.error("Could not understand audio")
 
-    # ==============================================================================
-    # 🤖 UPGRADE 4: AI PROCESSING LAYER (DETAILED METRICS BREAKDOWN)
+        # ==============================================================================
+    # 🤖 UPGRADE 4: AI PROCESSING LAYER (WITH TIME PENALTY LOGIC)
     # ==============================================================================
     if st.button("Submit Answer"):
         if answer:
+            # Calculate exactly how long the user took
+            time_taken = int(time.time() - st.session_state.q_start_time)
+            
             with st.spinner("🤖 AI is analyzing your answer... Please wait..."):
                 try:
                     client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
                     
+                    # We pass the time taken into the prompt so Gemini knows if they were fast or slow!
                     prompt = f"""
                     You are an expert tech and HR interviewer. Evaluate the candidate's answer for the given question.
                     
                     Question: "{st.session_state.question}"
                     Candidate Answer: "{answer}"
                     Interview Type: "{category}"
+                    Time Taken by Candidate: {time_taken} seconds (Target is under 60 seconds)
                     
                     Provide the response in the exact following template format:
-                    SCORE: [Give an integer score out of 10 based on accuracy]
+                    SCORE: [Give an integer score out of 10 based on accuracy. Deduct 1-2 points if Time Taken is greater than 60 seconds as a penalty]
                     STRENGTHS: [List 1-2 strengths of the answer]
                     WEAKNESSES: [List 1-2 gaps or missing points]
-                    IMPROVEMENT TIPS: [Provide 1 actionable tip to make the answer better]
+                    IMPROVEMENT TIPS: [Provide 1 actionable tip to make the answer better, mention pacing if they took too long]
                     """
                     
                     response = client.models.generate_content(
@@ -373,7 +370,19 @@ else:
                             extracted_score = 5
                             
                     st.session_state.current_score = extracted_score
-                    st.session_state.ai_feedback = response_text
+                    st.session_state.ai_feedback = f"⏱️ **Time Taken:** {time_taken} seconds\n\n{response_text}"
+                    
+                    # Cache current item details to session stack memory
+                    st.session_state.session_answers.append(f"Q: {st.session_state.question} | A: {answer} | Time: {time_taken}s")
+                    st.session_state.session_reviews.append(f"Q: {st.session_state.question} (Took {time_taken}s) | Review:\n{response_text}")
+                    
+                    st.session_state.total_score += extracted_score
+                    st.session_state.question_count += 1
+                    st.success("Answer Evaluated by Real AI! ✅ Click 'Next Question'")
+                    
+                except Exception as e:
+                    st.error(f"Gemini API Error: {e}")
+
                     
                     # UPGRADE 3: Cache current item details to session stack memory
                     st.session_state.session_answers.append(f"Q: {st.session_state.question} | A: {answer}")

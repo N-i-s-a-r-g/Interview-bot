@@ -97,7 +97,6 @@ CREATE TABLE IF NOT EXISTS users (
 )
 """)
 
-# UPGRADE 3: Added raw_answers and ai_review columns to map user details properly
 c.execute("""
 CREATE TABLE IF NOT EXISTS interview_history (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -138,7 +137,6 @@ if "ai_feedback" not in st.session_state:
 if "current_score" not in st.session_state:
     st.session_state.current_score = 0
 
-# UPGRADE 3: Cache current session full logs to save at the end
 if "session_answers" not in st.session_state:
     st.session_state.session_answers = []
 
@@ -296,21 +294,21 @@ else:
     if "question" not in st.session_state:
         st.session_state.question = random.choice(questions)
 
-        # ==============================================================================
+    # ==============================================================================
     # ❓ SECTION: QUESTION DISPLAY & BACKGROUND TIMER TRACKING
     # ==============================================================================
     st.write(f"Question {st.session_state.question_count + 1} of 5")
     st.subheader("❓ Interview Question")
     st.write(st.session_state.question)
 
-    # Background Timestamp Validation Engine (No UI Loops!)
+    # Background Timestamp Validation Engine
     if "q_start_time" not in st.session_state or st.session_state.get("last_q_tracked") != st.session_state.question:
         st.session_state.q_start_time = time.time()
         st.session_state.last_q_tracked = st.session_state.question
 
     st.info("⏱️ **Time Limit:** 60 Seconds recommended per question. Your pacing is evaluated at submission!")
 
-    # ✍️ FIXED INPUT BOX (Static key keeps it persistent and visible)
+    # ✍️ FIXED INPUT BOX
     answer = st.text_area("✍️ Your Answer:", key="user_interview_answer_box")
     
     # 🎙️ AUDIO CAPTURE SYSTEM
@@ -332,7 +330,6 @@ else:
     # ==============================================================================
     if st.button("Submit Answer"):
         if answer:
-            # Calculate total seconds taken in background
             time_taken = int(time.time() - st.session_state.q_start_time)
             
             with st.spinner("🤖 AI is analyzing your answer... Please wait..."):
@@ -380,24 +377,12 @@ else:
                     st.session_state.total_score += extracted_score
                     st.session_state.question_count += 1
                     st.success("Answer Evaluated by Real AI! ✅ Click 'Next Question'")
+                    st.rerun()
                     
                 except Exception as e:
                     st.error(f"Gemini API Error: {e}")
         else:
             st.warning("Please type your answer before submitting! ⚠️")
-
-
-                    
-                    # UPGRADE 3: Cache current item details to session stack memory
-                    st.session_state.session_answers.append(f"Q: {st.session_state.question} | A: {answer}")
-                    st.session_state.session_reviews.append(f"Q: {st.session_state.question} | Review:\n{response_text}")
-                    
-                    st.session_state.total_score += extracted_score
-                    st.session_state.question_count += 1
-                    st.success("Answer Evaluated by Real AI! ✅ Click 'Next Question'")
-                    
-                except Exception as e:
-                    st.error(f"Gemini API Error: {e}")
 
     # UI Feedback Presentation Rendering
     st.markdown("---")
@@ -417,7 +402,6 @@ else:
     # ==============================================================================
     if st.session_state.question_count >= 5:
         if not st.session_state.saved:
-            # Flatten answer stacks to string blocks permanently
             flat_answers = " || ".join(st.session_state.session_answers)
             flat_reviews = " || ".join(st.session_state.session_reviews)
             
@@ -480,3 +464,4 @@ else:
         c.execute("SELECT username FROM users")
         all_registered_users = c.fetchall()
         st.table(all_registered_users)
+

@@ -4,7 +4,7 @@ import speech_recognition as sr
 import sqlite3
 from datetime import datetime
 from google import genai  # 👈 New Free SDK
-
+import hashlib
 # ⚠️ 1. Set page config MUST be the first Streamlit command!
 st.set_page_config(page_title="AI Interview Bot", layout="centered")
 
@@ -31,6 +31,8 @@ CREATE TABLE IF NOT EXISTS interview_history (
 )
 """)
 conn.commit()
+def hash_password(password):
+    return hashlib.sha256(password.encode()).hexdigest()
 
 # ==========================================
 # 🧠 MEMORY MANAGEMENT (Session State)
@@ -55,13 +57,17 @@ if "ai_feedback" not in st.session_state:
     st.session_state.ai_feedback = "Submit an answer to see AI insights."
 if "current_score" not in st.session_state:
     st.session_state.current_score = 0
+if "otp" not in st.session_state:
+    st.session_state.otp = None
 
+if "otp_user" not in st.session_state:
+    st.session_state.otp_user = None
 # ==========================================
 # 🔐 AUTHENTICATION FUNCTION
 # ==========================================
 def login():
     st.title("🔐 Authentication")
-    mode = st.radio("Select Action", ["Login", "Signup"], horizontal=True)
+    mode = st.radio("Select Action", ["Login", "Signup", "Forgot Password"], horizontal=True)
     username = st.text_input("Username", key="auth_user")
     password = st.text_input("Password", type="password", key="auth_pass")
 
@@ -72,14 +78,52 @@ def login():
                 if c.fetchone():
                     st.error("User already exists ❌")
                 else:
-                    c.execute("INSERT INTO users VALUES (?, ?)", (username, password))
+                    hashed = hash_password(password)
+                    c.execute("INSERT INTO users VALUES (?, ?)", (username, hashed))
                     conn.commit()
                     st.success("Account created successfully ✅ Go to Login!")
             else:
                 st.warning("Please enter username and password! ⚠️")
+                elif mode == "Forgot Password":
+                    st.subheader("🔑 Reset Password with OTP")
+
+                    if st.button("Send OTP"):
+                    if username:
+                    c.execute("SELECT * FROM users WHERE username=?", (username,))
+            
+                    if c.fetchone():
+                       otp = random.randint(1000, 9999)   # 👈 OTP generate
+                       st.session_state.otp = str(otp)    # 👈 store in session
+                       st.session_state.otp_user = username
+
+                       st.success(f"OTP: {otp} (demo only)")  # 👈 show OTP
+                   else:
+                       st.error("User not found ❌")
+                   else:
+                       st.warning("Enter username and new password ⚠️")
+                       entered_otp = st.text_input("Enter OTP")
+                       new_password = st.text_input("New Password", type="password")
+
+                    if st.button("Verify & Reset"):
+                    if entered_otp == st.session_state.otp:
+                       hashed = hash_password(new_password)
+
+                       c.execute(
+                        "UPDATE users SET password=? WHERE username=?",
+                       (hashed, st.session_state.otp_user)
+                       )
+                       conn.commit()
+
+                       st.success("Password reset successful ✅")
+
+                       st.session_state.otp = None
+                       st.session_state.otp_user = None
+                   else:
+                       st.error("Invalid OTP ❌")
     else:
         if st.button("Login"):
-            c.execute("SELECT * FROM users WHERE username=? AND password=?", (username, password))
+            hashed = hash_password(password)
+            c.execute("SELECT * FROM users WHERE username=? AND password=?", (username, hashed))
             if c.fetchone():
                 st.session_state.logged_in = True
                 st.session_state.user = username

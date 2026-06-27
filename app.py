@@ -237,22 +237,42 @@ else:
 
     st.markdown("---")
 
-    # 📊 SUB-SECTION: USER HISTORY DASHBOARD
-    st.subheader("📊 My Interview History")
-    c.execute(
-        "SELECT score, category, date FROM interview_history WHERE username=? ORDER BY id DESC",
-        (st.session_state.user,)
-    )
+        # ==============================================================================
+    # 📊 SUB-SECTION: USER HISTORY & ANALYTICS DASHBOARD (UPGRADE 1)
+    # ==============================================================================
+    st.subheader("📊 My Performance Dashboard")
+    
+    # Fetch historical data for the logged-in user
+    c.execute( "SELECT score, category, date FROM interview_history WHERE username=? ORDER BY id DESC",(st.session_state.user,) )
     history = c.fetchall()
 
     if history:
-        st.table(history)
-        scores = [row[0] for row in history]
-        st.line_chart(scores) 
+        # Core Analytics Calculations
+        total_interviews = len(history)
+        scores_list = [row[0] for row in history]
+        avg_score = sum(scores_list) / total_interviews
+        best_score = max(scores_list)
+        
+        # 3-Column Layout Grid for Stats
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric(label="Total Interviews 🏁", value=total_interviews)
+        with col2:
+            st.metric(label="Average Score 📈", value=f"{avg_score:.1f} / 50")
+        with col3:
+            st.metric(label="Personal Best ⭐", value=f"{best_score} / 50")
+            
+        st.markdown("### 📉 Historical Score Progress Trend")
+        st.line_chart(scores_list)
+        
+        # Keep the detailed table clean inside an expander
+        with st.expander("📄 View Full Raw Logs Table"):
+            st.table(history)
     else:
-        st.info("No history yet 📋 Start your first interview below!")
+        st.info("No history logs yet 📋 Complete an interview sequence to activate your analytics dashboard!")
 
     st.markdown("---")
+
 
     # 🎤 SUB-SECTION: LIVE INTERVIEW FLOW RUNNER
     category = st.selectbox("Select Interview Type", ["HR", "Technical"])

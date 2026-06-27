@@ -5,12 +5,13 @@ import sqlite3
 from datetime import datetime
 from google import genai 
 import hashlib
+import time
 
 # ⚠️ 1. Set page config MUST be the first Streamlit command!
 st.set_page_config(page_title="AI Interview Bot", layout="centered")
+
 st.markdown("""
 <style>
-
 /* 🌈 Animated Gradient Background */
 body {
     background: linear-gradient(-45deg, #020617, #0f172a, #0ea5e9, #1d4ed8);
@@ -18,7 +19,6 @@ body {
     animation: gradientBG 10s ease infinite;
 }
 
-/* Animation */
 @keyframes gradientBG {
     0% {background-position: 0% 50%;}
     50% {background-position: 100% 50%;}
@@ -43,7 +43,6 @@ body {
     padding: 10px;
 }
 
-/* Focus glow */
 .stTextInput input:focus, .stTextArea textarea:focus {
     border: 1px solid #3b82f6;
     box-shadow: 0 0 10px #3b82f6;
@@ -59,35 +58,29 @@ body {
     transition: all 0.3s ease;
 }
 
-/* ✨ Hover Animation */
 .stButton>button:hover {
     transform: translateY(-3px) scale(1.05);
     background: linear-gradient(135deg, #2563eb, #4f46e5);
     box-shadow: 0 8px 25px rgba(99,102,241,0.7);
 }
 
-/* 📊 Tables */
 .stTable {
     background-color: #1e293b;
     border-radius: 10px;
 }
 
-/* 📢 Info Box */
 .stAlert {
     border-radius: 12px;
 }
 
-/* 📝 Headings */
 h1, h2, h3 {
     color: #f8fafc;
     text-align: center;
 }
 
-/* Divider */
 hr {
     border: 1px solid #334155;
 }
-
 </style>
 """, unsafe_allow_html=True)
 
@@ -104,18 +97,20 @@ CREATE TABLE IF NOT EXISTS users (
 )
 """)
 
+# UPGRADE 3: Added raw_answers and ai_review columns to map user details properly
 c.execute("""
 CREATE TABLE IF NOT EXISTS interview_history (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT,
     score INTEGER,
     category TEXT,
-    date TEXT
+    date TEXT,
+    raw_answers TEXT,
+    ai_review TEXT
 )
 """)
 conn.commit()
 
-# Password Security Hashing
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
@@ -143,6 +138,13 @@ if "ai_feedback" not in st.session_state:
 if "current_score" not in st.session_state:
     st.session_state.current_score = 0
 
+# UPGRADE 3: Cache current session full logs to save at the end
+if "session_answers" not in st.session_state:
+    st.session_state.session_answers = []
+
+if "session_reviews" not in st.session_state:
+    st.session_state.session_reviews = []
+
 if "otp" not in st.session_state:
     st.session_state.otp = None
 
@@ -150,7 +152,7 @@ if "otp_user" not in st.session_state:
     st.session_state.otp_user = None
 
 # ==============================================================================
-# 🔐 SECTION 3: AUTHENTICATION FLOW (Login, Signup & Forgot Password)
+# 🔐 SECTION 3: AUTHENTICATION FLOW
 # ==============================================================================
 def login():
     st.title("🔐 Authentication")
@@ -159,7 +161,6 @@ def login():
     username = st.text_input("Username", key="auth_user")
     password = st.text_input("Password", type="password", key="auth_pass")
 
-    # 📁 SUB-SECTION: SIGNUP MODE
     if mode == "Signup":
         if st.button("Create Account"):
             if username and password:
@@ -174,10 +175,8 @@ def login():
             else:
                 st.warning("Please enter username and password! ⚠️")
                 
-    # 📁 SUB-SECTION: FORGOT PASSWORD MODE 
     elif mode == "Forgot Password":
         st.subheader("🔑 Reset Password with OTP")
-
         if st.button("Send OTP"):
             if username:
                 c.execute("SELECT * FROM users WHERE username=?", (username,))
@@ -197,10 +196,7 @@ def login():
         if st.button("Verify & Reset"):
             if st.session_state.otp and entered_otp == st.session_state.otp:
                 hashed = hash_password(new_password)
-                c.execute(
-                    "UPDATE users SET password=? WHERE username=?",
-                    (hashed, st.session_state.otp_user)
-                )
+                c.execute("UPDATE users SET password=? WHERE username=?", (hashed, st.session_state.otp_user))
                 conn.commit()
                 st.success("Password reset successful ✅ You can log in now!")
                 st.session_state.otp = None
@@ -208,7 +204,6 @@ def login():
             else:
                 st.error("Invalid OTP or session expired ❌")
                 
-    # 📁 SUB-SECTION: LOGIN MODE
     else:
         if st.button("Login"):
             hashed = hash_password(password)
@@ -222,7 +217,7 @@ def login():
                 st.error("Invalid Credentials ❌")
 
 # ==============================================================================
-# 🚀 SECTION 4: CORE APPLICATION FLOW (Runs only after validation)
+# 🚀 SECTION 4: CORE APPLICATION FLOW
 # ==============================================================================
 if not st.session_state.logged_in:
     login()
@@ -237,42 +232,41 @@ else:
 
     st.markdown("---")
 
-        # ==============================================================================
-    # 📊 SUB-SECTION: USER HISTORY & ANALYTICS DASHBOARD (UPGRADE 1)
+    # ==============================================================================
+    # 📊 UPGRADE 1: USER HISTORY & ANALYTICS DASHBOARD
     # ==============================================================================
     st.subheader("📊 My Performance Dashboard")
-    
-    # Fetch historical data for the logged-in user
-    c.execute( "SELECT score, category, date FROM interview_history WHERE username=? ORDER BY id DESC",(st.session_state.user,) )
+    c.execute("SELECT score, category, date FROM interview_history WHERE username=? ORDER BY id DESC", (st.session_state.user,))
     history = c.fetchall()
 
     if history:
-        # Core Analytics Calculations
         total_interviews = len(history)
         scores_list = [row[0] for row in history]
         avg_score = sum(scores_list) / total_interviews
         best_score = max(scores_list)
         
-        # 3-Column Layout Grid for Stats
         col1, col2, col3 = st.columns(3)
         with col1:
             st.metric(label="Total Interviews 🏁", value=total_interviews)
         with col2:
             st.metric(label="Average Score 📈", value=f"{avg_score:.1f} / 50")
         with col3:
-            st.metric(label="Personal Best ⭐", value=f"{best_score} / 50")
+            st.metric(label="Personal Best ⭐", value=best_score)
             
         st.markdown("### 📉 Historical Score Progress Trend")
         st.line_chart(scores_list)
         
-        # Keep the detailed table clean inside an expander
-        with st.expander("📄 View Full Raw Logs Table"):
-            st.table(history)
+        with st.expander("📄 View Full Detailed Logs (Answers & Reviews)"):
+            c.execute("SELECT score, category, date, raw_answers, ai_review FROM interview_history WHERE username=? ORDER BY id DESC", (st.session_state.user,))
+            full_history = c.fetchall()
+            for row in full_history:
+                st.write(f"**Date:** {row[2]} | **Category:** {row[1]} | **Total Score:** {row[0]}/50")
+                st.info(f"💬 **AI Review Log:**\n{row[4]}")
+                st.markdown("---")
     else:
         st.info("No history logs yet 📋 Complete an interview sequence to activate your analytics dashboard!")
 
     st.markdown("---")
-
 
     # 🎤 SUB-SECTION: LIVE INTERVIEW FLOW RUNNER
     category = st.selectbox("Select Interview Type", ["HR", "Technical"])
@@ -305,13 +299,10 @@ else:
     st.write(f"Question {st.session_state.question_count + 1} of 5")
     st.subheader("❓ Interview Question")
     st.write(st.session_state.question)
-    # ==============================================================================
-    # ==============================================================================
-    # ⏱️ SUB-SECTION: INTERVIEW QUESTION TIMER (UPGRADE 2 - STABLE RUNNING VERSION)
-    # ==============================================================================
-    import time
 
-    # Initialize timestamp memory elements securely
+    # ==============================================================================
+    # ⏱️ UPGRADE 2: INTERVIEW QUESTION TIMER (SAFE NON-BLOCKING FIXED VERSION)
+    # ==============================================================================
     if "start_time" not in st.session_state or st.session_state.get("last_q") != st.session_state.question:
         st.session_state.start_time = time.time()
         st.session_state.last_q = st.session_state.question
@@ -319,21 +310,14 @@ else:
     elapsed_time = int(time.time() - st.session_state.start_time)
     remaining_time = max(0, 60 - elapsed_time)
 
-    # Static component allocation map object container
-    timer_placeholder = st.empty()
-
     if remaining_time > 0:
-        # Render tracking format container blocks elements grid alignment setup properties
-        timer_placeholder.metric(label="⏳ Live Time Remaining", value=f"{remaining_time} seconds")
-        # Check active state and sleep runtime loop ticker cleanly
-        if remaining_time > 1:
-            time.sleep(1)
-            st.rerun()
+        st.metric(label="⏳ Time Remaining for this question", value=f"{remaining_time} Seconds")
+        if remaining_time < 15:
+            st.warning("⚠️ Action window closing! Please finalize your thoughts and submit.")
     else:
-        timer_placeholder.error("⏰ **Time's Up!** Please type your summary and click 'Submit Answer' immediately!")
+        st.error("⏰ **Time's Up!** Please summarize your thoughts and click 'Submit Answer' immediately!")
 
-
-    answer = st.text_area("✍️ Your Answer:")
+    answer = st.text_area("✍️ Your Answer:", key=f"ans_{st.session_state.question_count}")
     
     # 🎙️ AUDIO CAPTURE SYSTEM
     if st.button("🎤 Use Voice Input"):
@@ -349,7 +333,9 @@ else:
             except Exception as e:
                 st.error("Could not understand audio")
 
-    # 🤖 AI PROCESSING LAYER (GEMINI CALL)
+    # ==============================================================================
+    # 🤖 UPGRADE 4: AI PROCESSING LAYER (DETAILED METRICS BREAKDOWN)
+    # ==============================================================================
     if st.button("Submit Answer"):
         if answer:
             with st.spinner("🤖 AI is analyzing your answer... Please wait..."):
@@ -363,9 +349,11 @@ else:
                     Candidate Answer: "{answer}"
                     Interview Type: "{category}"
                     
-                    Provide the response in the exact following format:
-                    SCORE: [Give an integer score out of 10 based on accuracy, e.g., 7]
-                    FEEDBACK: [Provide a constructive 2-3 line feedback with strengths and improvement points]
+                    Provide the response in the exact following template format:
+                    SCORE: [Give an integer score out of 10 based on accuracy]
+                    STRENGTHS: [List 1-2 strengths of the answer]
+                    WEAKNESSES: [List 1-2 gaps or missing points]
+                    IMPROVEMENT TIPS: [Provide 1 actionable tip to make the answer better]
                     """
                     
                     response = client.models.generate_content(
@@ -375,17 +363,21 @@ else:
                     
                     response_text = response.text
                     
-                    if "SCORE:" in response_text and "FEEDBACK:" in response_text:
-                        parts = response_text.split("FEEDBACK:")
-                        score_part = parts[0].replace("SCORE:", "").strip()
-                        feedback_part = parts[1].strip()
-                        extracted_score = int(''.join(filter(str.isdigit, score_part)))
-                    else:
-                        extracted_score = 5
-                        feedback_part = response_text
-                        
+                    # Secure integer extractor out of raw text response
+                    extracted_score = 5
+                    if "SCORE:" in response_text:
+                        try:
+                            score_part = response_text.split("SCORE:")[1].split("\n")[0]
+                            extracted_score = int(''.join(filter(str.isdigit, score_part)))
+                        except:
+                            extracted_score = 5
+                            
                     st.session_state.current_score = extracted_score
-                    st.session_state.ai_feedback = feedback_part
+                    st.session_state.ai_feedback = response_text
+                    
+                    # UPGRADE 3: Cache current item details to session stack memory
+                    st.session_state.session_answers.append(f"Q: {st.session_state.question} | A: {answer}")
+                    st.session_state.session_reviews.append(f"Q: {st.session_state.question} | Review:\n{response_text}")
                     
                     st.session_state.total_score += extracted_score
                     st.session_state.question_count += 1
@@ -396,7 +388,7 @@ else:
 
     # UI Feedback Presentation Rendering
     st.markdown("---")
-    st.subheader("📊 Real-Time AI Review")
+    st.subheader("📊 Real-Time AI Review Breakdown")
     st.metric(label="Last Answer Score", value=f"{st.session_state.current_score} / 10")
     st.info(st.session_state.ai_feedback)
         
@@ -407,21 +399,29 @@ else:
         st.session_state.current_score = 0
         st.rerun()
         
-    # 🏁 SUB-SECTION: RESULTS & METRIC DOWNLOAD GENERATOR
+    # ==============================================================================
+    # 🏁 UPGRADE 3 & 5: RESULTS LOG GENERATION & REPORT SETUP
+    # ==============================================================================
     if st.session_state.question_count >= 5:
         if not st.session_state.saved:
+            # Flatten answer stacks to string blocks permanently
+            flat_answers = " || ".join(st.session_state.session_answers)
+            flat_reviews = " || ".join(st.session_state.session_reviews)
+            
             c.execute(
-                "INSERT INTO interview_history (username, score, category, date) VALUES (?, ?, ?, ?)",
+                "INSERT INTO interview_history (username, score, category, date, raw_answers, ai_review) VALUES (?, ?, ?, ?, ?, ?)",
                 (
                     st.session_state.user,
                     st.session_state.total_score,
                     category,
-                    datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    flat_answers,
+                    flat_reviews
                 )
             )
             conn.commit()
             st.session_state.saved = True
-            st.success("Results saved to history permanently! 💾")
+            st.success("Full session logs successfully saved to your profile data history! 💾")
 
         st.subheader("🏁 Final Interview Result")
         st.write(f"Total Cumulative Score: {st.session_state.total_score} / 50")
@@ -433,13 +433,15 @@ else:
         else:
             st.warning("⚠️ Needs improvement")
 
-        report = f"Interview Report\n\nTotal Score: {st.session_state.total_score}/50\nQuestions Answered: {st.session_state.question_count}\nPerformance: "
+        report = f"Interview Report\n\nTotal Score: {st.session_state.total_score}/50\nPerformance: "
         if st.session_state.total_score > 35:
             report += "Excellent"
         elif st.session_state.total_score > 20:
             report += "Good"
         else:
             report += "Needs Improvement"
+            
+        report += "\n\n--- Detailed Log Breakdown ---\n" + "\n".join(st.session_state.session_reviews)
 
         st.download_button(
             "📥 Download Report",
@@ -453,10 +455,12 @@ else:
             st.session_state.total_score = 0
             st.session_state.current_score = 0
             st.session_state.ai_feedback = "Submit an answer to see AI insights."
+            st.session_state.session_answers = []
+            st.session_state.session_reviews = []
             st.session_state.question = random.choice(questions)
             st.rerun()
 
-    # 🛠️ SUB-SECTION: ADMIN PANEL LOG PANEL CONTROLS
+    # Admin Control Panel Log Panel
     if st.session_state.user == "admin":
         st.markdown("---")
         st.subheader("👥 All Users (Admin Control Panel)")

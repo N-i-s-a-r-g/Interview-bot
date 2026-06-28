@@ -3,7 +3,7 @@ import random
 import speech_recognition as sr
 import sqlite3
 from datetime import datetime
-import google.generativeai as genai_legacy
+from google import genai
 import hashlib
 import time
 
@@ -336,7 +336,7 @@ else:
                 try:
                     # Configure using legacy but bulletproof approach
                     genai_legacy.configure(api_key=st.secrets["GEMINI_API_KEY"])
-                    model = genai_legacy.GenerativeModel('gemini-1.5-flash')
+                    model = genai_legacy.GenerativeModel('gemini-2.5-flash')
                     
                     prompt = f"""
                     You are an expert tech and HR interviewer. Evaluate the candidate's answer for the given question.

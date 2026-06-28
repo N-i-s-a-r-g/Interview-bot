@@ -3,9 +3,10 @@ import random
 import speech_recognition as sr
 import sqlite3
 from datetime import datetime
-from google import genai
+from google import genai 
 import hashlib
 import time
+import re
 
 # ⚠️ 1. Set page config MUST be the first Streamlit command!
 st.set_page_config(page_title="AI Interview Bot", layout="centered")
@@ -85,9 +86,10 @@ hr {
 """, unsafe_allow_html=True)
 
 # ==============================================================================
-# 🗄️ SECTION 1: DATABASE CONNECTION & SCHEMA SETUP
+# 🗄️ SECTION 1: FRESH DATABASE CONNECTION & SCHEMA SETUP (v2 FIXED)
 # ==============================================================================
-conn = sqlite3.connect("users.db", check_same_thread=False)
+# Renamed database to users_v2.db to force-apply schema update on Streamlit Cloud
+conn = sqlite3.connect("users_v2.db", check_same_thread=False)
 c = conn.cursor()
 
 c.execute("""
@@ -266,7 +268,7 @@ else:
 
     st.markdown("---")
 
-    # 🎤 SUB-SECTION: LIVE INTERVIEW FLOW RUNNER
+    # 🎤 LIVE INTERVIEW FLOW RUNNER
     category = st.selectbox("Select Interview Type", ["HR", "Technical"])
     
     if category == "HR":
@@ -294,116 +296,113 @@ else:
     if "question" not in st.session_state:
         st.session_state.question = random.choice(questions)
 
-    # ==============================================================================
-    # ❓ SECTION: QUESTION DISPLAY & BACKGROUND TIMER TRACKING
-    # ==============================================================================
-    st.write(f"Question {st.session_state.question_count + 1} of 5")
-    st.subheader("❓ Interview Question")
-    st.write(st.session_state.question)
+    # Prevent loop overflow past 5 questions
+    if st.session_state.question_count < 5:
+        st.write(f"Question {st.session_state.question_count + 1} of 5")
+        st.subheader("❓ Interview Question")
+        st.write(st.session_state.question)
 
-    # Background Timestamp Validation Engine
-    if "q_start_time" not in st.session_state or st.session_state.get("last_q_tracked") != st.session_state.question:
-        st.session_state.q_start_time = time.time()
-        st.session_state.last_q_tracked = st.session_state.question
+        # Background Timestamp Validation Engine
+        if "q_start_time" not in st.session_state or st.session_state.get("last_q_tracked") != st.session_state.question:
+            st.session_state.q_start_time = time.time()
+            st.session_state.last_q_tracked = st.session_state.question
 
-    st.info("⏱️ **Time Limit:** 60 Seconds recommended per question. Your pacing is evaluated at submission!")
+        st.info("⏱️ **Time Limit:** 60 Seconds recommended per question. Your pacing is evaluated at submission!")
 
-    # ✍️ FIXED INPUT BOX
-    answer = st.text_area("✍️ Your Answer:", key="user_interview_answer_box")
-    
-    # 🎙️ AUDIO CAPTURE SYSTEM
-    if st.button("🎤 Use Voice Input"):
-        st.warning("⚠️ Voice input not supported in deployed version")
-        r = sr.Recognizer()  
-        with sr.Microphone() as source:
-            st.info("Speak now...")
-            audio = r.listen(source)
-            try:
-                text = r.recognize_google(audio)
-                st.success("You said: " + text)
-                answer = text
-            except Exception as e:
-                st.error("Could not understand audio")
-
-           # ==============================================================================
-    # 🤖 AI PROCESSING LAYER (FITTED WITH GEMINI 2.5 FLASH)
-    # ==============================================================================
-    if st.button("Submit Answer"):
-        if answer:
-            time_taken = int(time.time() - st.session_state.q_start_time)
-            
-            with st.spinner("🤖 AI is analyzing your answer... Please wait..."):
+        answer = st.text_area("✍️ Your Answer:", key="user_interview_answer_box")
+        
+        # 🎙️ AUDIO CAPTURE SYSTEM
+        if st.button("🎤 Use Voice Input"):
+            st.warning("⚠️ Voice input not supported in deployed version")
+            r = sr.Recognizer()  
+            with sr.Microphone() as source:
+                st.info("Speak now...")
+                audio = r.listen(source)
                 try:
-                    # Initialize the modern correct client setup
-                    client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
-                    
-                    prompt = f"""
-                    You are an expert tech and HR interviewer. Evaluate the candidate's answer for the given question.
-                    
-                    Question: "{st.session_state.question}"
-                    Candidate Answer: "{answer}"
-                    Interview Type: "{category}"
-                    Time Taken by Candidate: {time_taken} seconds (Target is under 60 seconds)
-                    
-                    Provide the response in the exact following template format:
-                    SCORE: [Give an integer score out of 10 based on accuracy. Deduct 1-2 points if Time Taken is greater than 60 seconds as a penalty]
-                    STRENGTHS: [List 1-2 strengths of the answer]
-                    WEAKNESSES: [List 1-2 gaps or missing points]
-                    IMPROVEMENT TIPS: [Provide 1 actionable tip to make the answer better, mention pacing if they took too long]
-                    """
-                    
-                    # Call content generation using standard modern SDK format
-                    response = client.models.generate_content(
-                        model='gemini-2.5-flash',
-                        contents=prompt,
-                    )
-                    response_text = response.text
-                    
-                    # Extract score safely
-                    extracted_score = 5
-                    if "SCORE:" in response_text:
-                        try:
-                            score_part = response_text.split("SCORE:")[1].split("\n")[0]
-                            extracted_score = int(''.join(filter(str.isdigit, score_part)))
-                        except:
-                            extracted_score = 5
-                            
-                    st.session_state.current_score = extracted_score
-                    st.session_state.ai_feedback = f"⏱️ **Time Taken:** {time_taken} seconds\n\n{response_text}"
-                    
-                    # Store to session history arrays
-                    st.session_state.session_answers.append(f"Q: {st.session_state.question} | A: {answer} | Time: {time_taken}s")
-                    st.session_state.session_reviews.append(f"Q: {st.session_state.question} (Took {time_taken}s) | Review:\n{response_text}")
-                    
-                    st.session_state.total_score += extracted_score
-                    st.session_state.question_count += 1
-                    st.success("Answer Evaluated by Real AI! ✅ Click 'Next Question'")
-                    st.rerun()
-                    
+                    text = r.recognize_google(audio)
+                    st.success("You said: " + text)
+                    answer = text
                 except Exception as e:
-                    st.error(f"Gemini API Error: {e}")
-        else:
-            st.warning("Please type your answer before submitting! ⚠️")
+                    st.error("Could not understand audio")
 
+        # ==============================================================================
+        # 🤖 AI PROCESSING LAYER (PRECISION SCORE EXTRACTOR FIXED)
+        # ==============================================================================
+        if st.button("Submit Answer"):
+            if answer:
+                time_taken = int(time.time() - st.session_state.q_start_time)
+                
+                with st.spinner("🤖 AI is analyzing your answer... Please wait..."):
+                    try:
+                        client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
+                        
+                        prompt = f"""
+                        You are an expert tech and HR interviewer. Evaluate the candidate's answer for the given question.
+                        
+                        Question: "{st.session_state.question}"
+                        Candidate Answer: "{answer}"
+                        Interview Type: "{category}"
+                        Time Taken by Candidate: {time_taken} seconds (Target is under 60 seconds)
+                        
+                        Provide the response in the exact following template format:
+                        SCORE: [Give ONLY a single integer digit score from 0 to 10 based on accuracy, e.g., SCORE: 7]
+                        STRENGTHS: [List 1-2 strengths of the answer]
+                        WEAKNESSES: [List 1-2 gaps or missing points]
+                        IMPROVEMENT TIPS: [Provide 1 actionable tip to make the answer better]
+                        """
+                        
+                        response = client.models.generate_content(
+                            model='gemini-2.5-flash',
+                            contents=prompt,
+                        )
+                        response_text = response.text
+                        
+                        # High Precision Regex Splitter for the Score Token
+                        extracted_score = 5
+                        score_match = re.search(r"SCORE:\s*(\d+)", response_text, re.IGNORECASE)
+                        if score_match:
+                            parsed_val = int(score_match.group(1))
+                            if parsed_val <= 10:
+                                extracted_score = parsed_val
+                            else:
+                                # Fallback if model wrote e.g. "SCORE: 7/10" -> takes first matching digit group
+                                extracted_score = int(str(parsed_val)[0])
+                                
+                        st.session_state.current_score = extracted_score
+                        st.session_state.ai_feedback = f"⏱️ **Time Taken:** {time_taken} seconds\n\n{response_text}"
+                        
+                        # Store records to dynamic arrays safely
+                        st.session_state.session_answers.append(f"Q: {st.session_state.question} | A: {answer} | Time: {time_taken}s")
+                        st.session_state.session_reviews.append(f"Q: {st.session_state.question} (Took {time_taken}s) | Review:\n{response_text}")
+                        
+                        st.session_state.total_score += extracted_score
+                        st.session_state.question_count += 1
+                        st.success("Answer Evaluated by Real AI! ✅ Click 'Next Question'")
+                        st.rerun()
+                        
+                    except Exception as e:
+                        st.error(f"Gemini API Error: {e}")
+            else:
+                st.warning("Please type your answer before submitting! ⚠️")
 
+        # UI Feedback Presentation Rendering
+        st.markdown("---")
+        st.subheader("📊 Real-Time AI Review Breakdown")
+        st.metric(label="Last Answer Score", value=f"{st.session_state.current_score} / 10")
+        st.info(st.session_state.ai_feedback)
+            
+        # Navigation Matrix Control
+        if st.button("Next Question"):
+            st.session_state.question = random.choice(questions)
+            st.session_state.ai_feedback = "Submit an answer to see AI insights."
+            st.session_state.current_score = 0
+            st.rerun()
 
-    # UI Feedback Presentation Rendering
-    st.markdown("---")
-    st.subheader("📊 Real-Time AI Review Breakdown")
-    st.metric(label="Last Answer Score", value=f"{st.session_state.current_score} / 10")
-    st.info(st.session_state.ai_feedback)
-        
-    # Navigation Matrix Control
-    if st.button("Next Question") and st.session_state.question_count < 5:
-        st.session_state.question = random.choice(questions)
-        st.session_state.ai_feedback = "Submit an answer to see AI insights."
-        st.session_state.current_score = 0
-        st.rerun()
-        
     # ==============================================================================
     # 🏁 UPGRADE 3 & 5: RESULTS LOG GENERATION & REPORT SETUP
     # ==============================================================================
     if st.session_state.question_count >= 5:
+        st.balloons()
         if not st.session_state.saved:
             flat_answers = " || ".join(st.session_state.session_answers)
             flat_reviews = " || ".join(st.session_state.session_reviews)
@@ -468,3 +467,5 @@ else:
         all_registered_users = c.fetchall()
         st.table(all_registered_users)
 
+                        
+            

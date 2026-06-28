@@ -325,8 +325,8 @@ else:
             except Exception as e:
                 st.error("Could not understand audio")
 
-        # ==============================================================================
-    # 🤖 AI PROCESSING LAYER (STABLE VERSION)
+           # ==============================================================================
+    # 🤖 AI PROCESSING LAYER (FITTED WITH GEMINI 2.5 FLASH)
     # ==============================================================================
     if st.button("Submit Answer"):
         if answer:
@@ -334,9 +334,8 @@ else:
             
             with st.spinner("🤖 AI is analyzing your answer... Please wait..."):
                 try:
-                    # Configure using legacy but bulletproof approach
-                    genai_legacy.configure(api_key=st.secrets["GEMINI_API_KEY"])
-                    model = genai_legacy.GenerativeModel('gemini-2.5-flash')
+                    # Initialize the modern correct client setup
+                    client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
                     
                     prompt = f"""
                     You are an expert tech and HR interviewer. Evaluate the candidate's answer for the given question.
@@ -353,8 +352,11 @@ else:
                     IMPROVEMENT TIPS: [Provide 1 actionable tip to make the answer better, mention pacing if they took too long]
                     """
                     
-                    # Call legacy generation method
-                    response = model.generate_content(prompt)
+                    # Call content generation using standard modern SDK format
+                    response = client.models.generate_content(
+                        model='gemini-2.5-flash',
+                        contents=prompt,
+                    )
                     response_text = response.text
                     
                     # Extract score safely
@@ -382,6 +384,7 @@ else:
                     st.error(f"Gemini API Error: {e}")
         else:
             st.warning("Please type your answer before submitting! ⚠️")
+
 
 
     # UI Feedback Presentation Rendering

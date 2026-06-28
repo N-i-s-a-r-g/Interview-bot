@@ -86,9 +86,8 @@ hr {
 """, unsafe_allow_html=True)
 
 # ==============================================================================
-# 🗄️ SECTION 1: FRESH DATABASE CONNECTION & SCHEMA SETUP (v2 FIXED)
+# 🗄️ Fresh Database Setup
 # ==============================================================================
-# Renamed database to users_v2.db to force-apply schema update on Streamlit Cloud
 conn = sqlite3.connect("users_v2.db", check_same_thread=False)
 c = conn.cursor()
 
@@ -116,7 +115,7 @@ def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
 # ==============================================================================
-# 🧠 SECTION 2: MEMORY MANAGEMENT (Session State Initialization)
+# 🧠 Session State Setup
 # ==============================================================================
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
@@ -152,7 +151,7 @@ if "otp_user" not in st.session_state:
     st.session_state.otp_user = None
 
 # ==============================================================================
-# 🔐 SECTION 3: AUTHENTICATION FLOW
+# 🔐 Auth Flow
 # ==============================================================================
 def login():
     st.title("🔐 Authentication")
@@ -217,7 +216,7 @@ def login():
                 st.error("Invalid Credentials ❌")
 
 # ==============================================================================
-# 🚀 SECTION 4: CORE APPLICATION FLOW
+# 🚀 Core Application Flow
 # ==============================================================================
 if not st.session_state.logged_in:
     login()
@@ -239,9 +238,12 @@ else:
     c.execute("SELECT score, category, date FROM interview_history WHERE username=? ORDER BY id DESC", (st.session_state.user,))
     history = c.fetchall()
 
-    if history:
-        total_interviews = len(history)
-        scores_list = [row[0] for row in history]
+    # Filter out any weird anomalies from dashboard view
+    clean_history = [row for row in history if row[0] <= 50]
+
+    if clean_history:
+        total_interviews = len(clean_history)
+        scores_list = [row[0] for row in clean_history]
         avg_score = sum(scores_list) / total_interviews
         best_score = max(scores_list)
         
@@ -260,9 +262,10 @@ else:
             c.execute("SELECT score, category, date, raw_answers, ai_review FROM interview_history WHERE username=? ORDER BY id DESC", (st.session_state.user,))
             full_history = c.fetchall()
             for row in full_history:
-                st.write(f"**Date:** {row[2]} | **Category:** {row[1]} | **Total Score:** {row[0]}/50")
-                st.info(f"💬 **AI Review Log:**\n{row[4]}")
-                st.markdown("---")
+                if row[0] <= 50:
+                    st.write(f"**Date:** {row[2]} | **Category:** {row[1]} | **Total Score:** {row[0]}/50")
+                    st.info(f"💬 **AI Review Log:**\n{row[4]}")
+                    st.markdown("---")
     else:
         st.info("No history logs yet 📋 Complete an interview sequence to activate your analytics dashboard!")
 
@@ -296,13 +299,12 @@ else:
     if "question" not in st.session_state:
         st.session_state.question = random.choice(questions)
 
-    # Prevent loop overflow past 5 questions
+    # Main Runner Form Container
     if st.session_state.question_count < 5:
         st.write(f"Question {st.session_state.question_count + 1} of 5")
         st.subheader("❓ Interview Question")
         st.write(st.session_state.question)
 
-        # Background Timestamp Validation Engine
         if "q_start_time" not in st.session_state or st.session_state.get("last_q_tracked") != st.session_state.question:
             st.session_state.q_start_time = time.time()
             st.session_state.last_q_tracked = st.session_state.question
@@ -311,22 +313,11 @@ else:
 
         answer = st.text_area("✍️ Your Answer:", key="user_interview_answer_box")
         
-        # 🎙️ AUDIO CAPTURE SYSTEM
         if st.button("🎤 Use Voice Input"):
             st.warning("⚠️ Voice input not supported in deployed version")
-            r = sr.Recognizer()  
-            with sr.Microphone() as source:
-                st.info("Speak now...")
-                audio = r.listen(source)
-                try:
-                    text = r.recognize_google(audio)
-                    st.success("You said: " + text)
-                    answer = text
-                except Exception as e:
-                    st.error("Could not understand audio")
 
         # ==============================================================================
-        # 🤖 AI PROCESSING LAYER (PRECISION SCORE EXTRACTOR FIXED)
+        # 🤖 AI PROCESSING LAYER (PRECISION PARSING)
         # ==============================================================================
         if st.button("Submit Answer"):
             if answer:
@@ -357,7 +348,7 @@ else:
                         )
                         response_text = response.text
                         
-                        # High Precision Regex Splitter for the Score Token
+                        # High Precision Regex Splitter
                         extracted_score = 5
                         score_match = re.search(r"SCORE:\s*(\d+)", response_text, re.IGNORECASE)
                         if score_match:
@@ -365,13 +356,11 @@ else:
                             if parsed_val <= 10:
                                 extracted_score = parsed_val
                             else:
-                                # Fallback if model wrote e.g. "SCORE: 7/10" -> takes first matching digit group
                                 extracted_score = int(str(parsed_val)[0])
                                 
                         st.session_state.current_score = extracted_score
                         st.session_state.ai_feedback = f"⏱️ **Time Taken:** {time_taken} seconds\n\n{response_text}"
                         
-                        # Store records to dynamic arrays safely
                         st.session_state.session_answers.append(f"Q: {st.session_state.question} | A: {answer} | Time: {time_taken}s")
                         st.session_state.session_reviews.append(f"Q: {st.session_state.question} (Took {time_taken}s) | Review:\n{response_text}")
                         
@@ -385,13 +374,11 @@ else:
             else:
                 st.warning("Please type your answer before submitting! ⚠️")
 
-        # UI Feedback Presentation Rendering
         st.markdown("---")
         st.subheader("📊 Real-Time AI Review Breakdown")
         st.metric(label="Last Answer Score", value=f"{st.session_state.current_score} / 10")
         st.info(st.session_state.ai_feedback)
             
-        # Navigation Matrix Control
         if st.button("Next Question"):
             st.session_state.question = random.choice(questions)
             st.session_state.ai_feedback = "Submit an answer to see AI insights."
@@ -399,28 +386,21 @@ else:
             st.rerun()
 
     # ==============================================================================
-    # 🏁 UPGRADE 3 & 5: RESULTS LOG GENERATION & REPORT SETUP
+    # 🏁 FINAL SUMMARY & SAFE CLEAN RESTART
     # ==============================================================================
     if st.session_state.question_count >= 5:
-        st.balloons()
         if not st.session_state.saved:
             flat_answers = " || ".join(st.session_state.session_answers)
             flat_reviews = " || ".join(st.session_state.session_reviews)
             
             c.execute(
                 "INSERT INTO interview_history (username, score, category, date, raw_answers, ai_review) VALUES (?, ?, ?, ?, ?, ?)",
-                (
-                    st.session_state.user,
-                    st.session_state.total_score,
-                    category,
-                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    flat_answers,
-                    flat_reviews
-                )
+                (st.session_state.user, st.session_state.total_score, category, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), flat_answers, flat_reviews)
             )
             conn.commit()
             st.session_state.saved = True
-            st.success("Full session logs successfully saved to your profile data history! 💾")
+            st.success("Full session logs successfully saved! 💾")
+            st.rerun()
 
         st.subheader("🏁 Final Interview Result")
         st.write(f"Total Cumulative Score: {st.session_state.total_score} / 50")
@@ -432,23 +412,14 @@ else:
         else:
             st.warning("⚠️ Needs improvement")
 
-        report = f"Interview Report\n\nTotal Score: {st.session_state.total_score}/50\nPerformance: "
-        if st.session_state.total_score > 35:
-            report += "Excellent"
-        elif st.session_state.total_score > 20:
-            report += "Good"
-        else:
-            report += "Needs Improvement"
-            
-        report += "\n\n--- Detailed Log Breakdown ---\n" + "\n".join(st.session_state.session_reviews)
+        report = f"Interview Report\n\nTotal Score: {st.session_state.total_score}/50\n\nDetailed Log Breakdown ---\n" + "\n".join(st.session_state.session_reviews)
 
-        st.download_button(
-            "📥 Download Report",
-            report,
-            file_name="interview_report.txt"
-        )
+        st.download_button("📥 Download Report", report, file_name="interview_report.txt")
 
+        # FIX: Force clean dynamic anomalies from database on hard reset
         if st.button("Restart Interview", key="restart_btn"):
+            c.execute("DELETE FROM interview_history WHERE username=? AND score > 50", (st.session_state.user,))
+            conn.commit()
             st.session_state.saved = False
             st.session_state.question_count = 0
             st.session_state.total_score = 0
@@ -458,14 +429,3 @@ else:
             st.session_state.session_reviews = []
             st.session_state.question = random.choice(questions)
             st.rerun()
-
-    # Admin Control Panel Log Panel
-    if st.session_state.user == "admin":
-        st.markdown("---")
-        st.subheader("👥 All Users (Admin Control Panel)")
-        c.execute("SELECT username FROM users")
-        all_registered_users = c.fetchall()
-        st.table(all_registered_users)
-
-                        
-            

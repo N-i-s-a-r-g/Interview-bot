@@ -351,10 +351,8 @@ else:
                     IMPROVEMENT TIPS: [Provide 1 actionable tip to make the answer better, mention pacing if they took too long]
                     """
                     
-                    response = client.models.generate_content(
-                        model='gemini-1.5-flash',
-                        contents=prompt,
-                    )
+                    response = client.models.generate_content(  model='gemini-1.5-flash', contents=prompt  )
+
                     
                     response_text = response.text
                     
